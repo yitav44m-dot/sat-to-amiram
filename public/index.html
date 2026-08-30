@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>SAT to Amiram — English Practice</title>
+<link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <header>
+    <h1>Psychometric English Practice</h1>
+    <p class="subtitle">Practice the English section of Israel's Psychometric Entrance Test</p>
+  </header>
+
+  <main id="app">
+    <section id="picker" class="card">
+      <h2>Choose an exam sitting</h2>
+      <div class="picker-row">
+        <label>
+          Season
+          <select id="season">
+            <option value="winter">Winter</option>
+            <option value="spring">Spring</option>
+            <option value="summer" selected>Summer</option>
+            <option value="autumn">Autumn</option>
+          </select>
+        </label>
+        <label>
+          Year
+          <input type="number" id="year" value="2025" min="2015" max="2100" />
+        </label>
+        <button id="load-btn">Load exam</button>
+      </div>
+      <p id="status" class="status"></p>
+    </section>
+
+    <section id="quiz" class="card" hidden>
+      <div class="quiz-header">
+        <span id="progress"></span>
+        <span id="exam-label"></span>
+      </div>
+      <div id="passage" class="passage" hidden></div>
+      <div id="question"></div>
+      <div id="options"></div>
+      <div class="nav-row">
+        <button id="prev-btn">Previous</button>
+        <button id="next-btn">Next</button>
+        <button id="finish-btn" hidden>Finish</button>
+      </div>
+    </section>
+
+    <section id="results" class="card" hidden>
+      <h2>Results</h2>
+      <p id="score-summary"></p>
+      <div id="review"></div>
+      <button id="restart-btn">Practice another exam</button>
+    </section>
+  </main>
+
+  <script src="/app.js"></script>
+</body>
+</html>

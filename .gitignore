@@ -1,0 +1,6 @@
+node_modules/
+data/pdfs/*.pdf
+data/exams/*.json
+!data/pdfs/.gitkeep
+!data/exams/.gitkeep
+.env

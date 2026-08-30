@@ -1,0 +1,13 @@
+{
+  "name": "sat-to-amiram",
+  "version": "1.0.0",
+  "description": "Practice the English section of Israel's Psychometric Entrance Test",
+  "type": "commonjs",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
