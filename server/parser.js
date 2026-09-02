@@ -7,6 +7,17 @@ function cleanText(text) {
   return text.replace(/�/g, '–');
 }
 
+// pdftotext renders a sentence-completion blank as extra inline whitespace
+// (the underline is a drawn line, not text), so a mid-line run of 2+ spaces
+// is a blank. Leading indentation from a wrapped continuation line is not
+// (nothing precedes it on that line), so it's left alone.
+function markBlanks(text) {
+  return text
+    .split('\n')
+    .map((line) => line.replace(/(\S) {2,}(?=\S)/g, '$1 ________ '))
+    .join('\n');
+}
+
 function stripNoise(text) {
   return text
     .split('\n')
@@ -51,7 +62,7 @@ function parseSimpleQuestions(block) {
     const body = m[3];
     const firstOptIdx = body.search(/\(1\)/);
     if (firstOptIdx === -1) continue;
-    const stem = cleanText(body.slice(0, firstOptIdx).replace(/\s+/g, ' ').trim());
+    const stem = cleanText(markBlanks(body.slice(0, firstOptIdx)).replace(/\s+/g, ' ').trim());
     const options = parseOptions(body.slice(firstOptIdx));
     if (stem && options.length === 4) {
       questions.push({ number, prompt: stem, options });

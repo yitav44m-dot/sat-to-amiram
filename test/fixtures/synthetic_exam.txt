@@ -1,0 +1,266 @@
+                                     Contents
+
+Answer Key............................................................................................111
+
+                                     8
+
+
+ENGLISH                                        This section contains 11 questions.
+                                               The time allotted is 20 minutes.
+
+The following section contains three types of questions: Sentence Completion, Restatement
+and Reading Comprehension. Each question is followed by four possible responses. Choose
+the response which best answers the question and mark its number in the appropriate place
+on the answer sheet.
+
+Sentence Completions (Questions 1-3)
+
+This part consists of sentences with a word or words missing in each. For each question,
+choose the answer which best completes the sentence.
+
+1. A good fixture helps a parser         hidden regressions.
+
+(1) detect
+(2) forbid
+(3) praise
+(4) recall
+
+2. The invented sample text is the        of the real exam layout.
+
+(1) forecaster
+(2) mirror
+(3) inspector
+(4) publisher
+
+                                     9
+
+3. Test suites          before a release, not after one.
+
+(1) run
+(2) bury
+(3) delay
+(4) ignore
+
+Restatements (Questions 4-5)
+
+This part consists of several sentences, each followed by four possible ways of restating
+the main idea of that sentence in different words.
+
+4. The parser strips page footers before it looks for questions.
+
+(1) Footers are removed first, then questions are found.
+(2) Questions are found first, then footers are removed.
+(3) Footers are never removed from the extracted text.
+(4) Questions and footers are found at the same time.
+
+5. Every option in a question must survive the cleanup step.
+
+(1) Cleanup may drop some options.
+(2) No option should be lost during cleanup.
+(3) Options are added during cleanup.
+(4) Cleanup applies only to stems.
+
+� Copyright by the National Institute for Testing and Evaluation. All rights reserved.
+The test or any part of it may not be taught, copied, photographed, recorded, or
+distributed in any form or by any means.
+English � First Section                        - 10 -                        Summer 2025
+
+Reading Comprehension
+
+This part consists of two passages, each followed by several related questions.
+
+Text I (Questions 6-8)
+
+(1) This passage is invented prose written only to exercise the parser. It is laid out
+       in numbered lines the way the extracted exam text is, so that the numbering is
+(5) stripped from the passage body when it is joined into a paragraph.
+(10) The passage also contains an em dash � to check that the replacement character
+       produced by the text extractor is turned back into a real dash.
+
+Questions
+
+6. The main purpose of the first paragraph is to -
+
+       (1) describe the fixture
+       (2) describe the parser
+       (3) describe the exam
+       (4) describe the dash
+
+7. According to the passage, the line numbers are -
+
+       (1) kept in place
+       (2) stripped out
+       (3) turned into dashes
+       (4) counted
+
+8. The passage suggests that the replacement character is -
+
+       (1) left alone
+       (2) deleted
+       (3) restored to a dash
+       (4) doubled
+
+Text II (Questions 9-11)
+
+(1) A second invented passage follows the first one so that both reading passages in a
+       section are covered by the fixture.
+(2) It is deliberately short.
+
+Questions
+
+9. The second passage exists in order to -
+
+       (1) cover a second passage
+       (2) cover a second section
+       (3) cover the answer key
+       (4) cover the footer
+
+10. The second passage is described as -
+
+       (1) long
+       (2) short
+       (3) missing
+       (4) numbered
+
+11. Both passages belong to -
+
+       (1) the same section
+       (2) different sections
+       (3) the answer key
+       (4) the appendix
+
+                                     11
+
+
+ENGLISH                                        This section contains 11 questions.
+                                               The time allotted is 20 minutes.
+
+The following section contains three types of questions: Sentence Completion, Restatement
+and Reading Comprehension. Each question is followed by four possible responses. Choose
+the response which best answers the question and mark its number in the appropriate place
+on the answer sheet.
+
+Sentence Completions (Questions 1-3)
+
+This part consists of sentences with a word or words missing in each.
+
+1. The second section repeats the         of the first one.
+
+(1) structure
+(2) footer
+(3) appendix
+(4) dash
+
+2. Question numbering          in each section.
+
+(1) restarts
+(2) continues
+(3) stops
+(4) reverses
+
+3. Each answer key row covers one          .
+
+(1) section
+(2) passage
+(3) option
+(4) page
+
+Restatements (Questions 4-5)
+
+This part consists of several sentences.
+
+4. The answer key is stored as one digit per question.
+
+(1) One digit stands for one question.
+(2) One digit stands for one section.
+(3) Digits are unrelated to questions.
+(4) Each question has four digits.
+
+5. Both sections are parsed with the same code path.
+
+(1) The sections use different parsers.
+(2) The sections share a parser.
+(3) Only the first section is parsed.
+(4) Only the second section is parsed.
+
+English � Second Section                        - 12 -                        Summer 2025
+
+Reading Comprehension
+
+This part consists of two passages, each followed by several related questions.
+
+Text I (Questions 6-8)
+
+(1) The third invented passage is here to give the second section a first text.
+(2) It is as short as the others.
+
+Questions
+
+6. The third passage belongs to -
+
+       (1) the first section
+       (2) the second section
+       (3) the answer key
+       (4) the appendix
+
+7. The third passage is -
+
+       (1) short
+       (2) long
+       (3) missing
+       (4) numbered
+
+8. The passage precedes its -
+
+       (1) questions
+       (2) footer
+       (3) key
+       (4) title
+
+Text II (Questions 9-11)
+
+(1) The last invented passage is followed by a heading whose line has stray column text
+       glued onto it, which is a real artifact of the layout-preserving extractor.
+
+Questions                                                          than the use of X-ray
+
+9. The heading above this question -
+
+       (1) has stray text on it
+       (2) is missing
+       (3) is duplicated
+       (4) is blank
+
+10. The stray text comes from -
+
+       (1) an adjacent column
+       (2) the answer key
+       (3) the appendix
+       (4) the footer
+
+11. The last question of the section is followed by -
+
+       (1) an appendix
+       (2) another passage
+       (3) another section
+       (4) nothing at all
+
+NAME A I.D. No.
+
+NATIONAL INSTITUTE FOR TESTING & EVALUATION
+
+Write your essay here. Do not write outside the frame. This appendix text must never be
+absorbed into the last option of the last question, and it goes on for a while so that the
+failure would be obvious if it ever happened again.
+
+1 2 3 4      1 2 3 4      1 2 3 4      1 2 3 4      1 2 3 4      1 2 3 4
+
+                                     Answer Key
+
+English � First Section
+   question number   1  2  3  4  5  6  7  8  9  10 11
+   correct answer    14231342431
+
+English � Second Section
+   question number   1  2  3  4  5  6  7  8  9  10 11
+   correct answer    12142124121

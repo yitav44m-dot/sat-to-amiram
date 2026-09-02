@@ -1,62 +1,98 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="he" dir="rtl">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>SAT to Amiram — English Practice</title>
+<title>סימולציית אמירם — תרגול אנגלית</title>
 <link rel="stylesheet" href="/styles.css" />
 </head>
 <body>
-  <header>
-    <h1>Psychometric English Practice</h1>
-    <p class="subtitle">Practice the English section of Israel's Psychometric Entrance Test</p>
-  </header>
-
   <main id="app">
-    <section id="picker" class="card">
-      <h2>Choose an exam sitting</h2>
+
+    <section id="picker" class="panel picker">
+      <h1>סימולציית אמירם</h1>
+      <p class="picker-sub">תרגול פרק האנגלית של הבחינה הפסיכומטרית</p>
       <div class="picker-row">
         <label>
-          Season
+          <span>מועד</span>
           <select id="season">
-            <option value="winter">Winter</option>
-            <option value="spring">Spring</option>
-            <option value="summer" selected>Summer</option>
-            <option value="autumn">Autumn</option>
+            <option value="winter">חורף</option>
+            <option value="spring">אביב</option>
+            <option value="summer" selected>קיץ</option>
+            <option value="autumn">סתיו</option>
           </select>
         </label>
         <label>
-          Year
-          <input type="number" id="year" value="2025" min="2015" max="2100" />
+          <span>שנה</span>
+          <input type="number" id="year" value="2024" min="2015" max="2100" />
         </label>
-        <button id="load-btn">Load exam</button>
+        <button id="load-btn" class="btn btn-green">התחל סימולציה</button>
       </div>
       <p id="status" class="status"></p>
     </section>
 
-    <section id="quiz" class="card" hidden>
-      <div class="quiz-header">
-        <span id="progress"></span>
-        <span id="exam-label"></span>
+    <section id="control" class="panel" hidden>
+      <div class="panel-top">
+        <span class="panel-label">התקדמות בסימולציה</span>
+        <span class="panel-progress">פרק <b id="part-now">1</b> מתוך <b id="part-total">1</b></span>
       </div>
-      <div id="passage" class="passage" hidden></div>
-      <div id="question"></div>
-      <div id="options"></div>
-      <div class="nav-row">
-        <button id="prev-btn">Previous</button>
-        <button id="next-btn">Next</button>
-        <button id="finish-btn" hidden>Finish</button>
+
+      <ol id="part-tabs" class="part-tabs"></ol>
+
+      <div class="panel-mid">
+        <div class="part-heading">
+          <h2 id="part-title"></h2>
+          <p id="part-sub" class="part-sub"></p>
+        </div>
+        <div class="timer">
+          <div class="timer-main">
+            <span id="timer-icon" class="timer-icon"></span>
+            <span id="timer-value" class="timer-value">0:00</span>
+          </div>
+          <span class="timer-label">זמן נותר</span>
+        </div>
+      </div>
+
+      <div class="panel-questions">
+        <span class="q-count">שאלה <b id="q-now">1</b> מתוך <b id="q-total">1</b></span>
+        <ol id="q-pills" class="q-pills"></ol>
+      </div>
+
+      <div class="panel-actions">
+        <div class="nav-group">
+          <button id="prev-btn" class="btn btn-gray">שאלה קודמת</button>
+          <button id="next-btn" class="btn btn-green">שאלה הבאה</button>
+        </div>
+        <button id="finish-part-btn" class="btn btn-orange">סיים פרק ועבור לבא</button>
       </div>
     </section>
 
-    <section id="results" class="card" hidden>
-      <h2>Results</h2>
-      <p id="score-summary"></p>
-      <div id="review"></div>
-      <button id="restart-btn">Practice another exam</button>
+    <section id="question-card" class="panel question-card" hidden>
+      <h3 id="q-instruction" class="q-instruction"></h3>
+
+      <div id="passage-box" class="passage-box" hidden>
+        <button id="passage-speak" class="speak speak-inset" type="button" aria-label="הקראת הקטע"></button>
+        <p id="passage-text" class="passage-text" dir="ltr" lang="en"></p>
+      </div>
+
+      <div class="q-stem">
+        <button id="stem-speak" class="speak speak-inset" type="button" aria-label="הקראת השאלה"></button>
+        <p id="q-stem-text" dir="ltr" lang="en"></p>
+      </div>
+
+      <ol id="q-options" class="q-options"></ol>
     </section>
+
+    <section id="results" class="panel results" hidden>
+      <h2>תוצאות הסימולציה</h2>
+      <p id="score-summary" class="score-summary"></p>
+      <div id="review"></div>
+      <button id="restart-btn" class="btn btn-green">תרגל בחינה נוספת</button>
+    </section>
+
   </main>
 
+  <script src="/amiram.js"></script>
   <script src="/app.js"></script>
 </body>
 </html>
