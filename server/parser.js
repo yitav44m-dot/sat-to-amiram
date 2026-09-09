@@ -56,11 +56,37 @@ function normalizeNativeBlanks(text) {
 // left no trace at all), still show one at the end rather than none — a
 // sentence-completion question with no visible blank reads as already
 // finished.
-function ensureBlank(stem) {
-  if (stem.includes('________')) return stem;
+function appendBlank(stem) {
   const endsWithPeriod = stem.endsWith('.');
   const body = (endsWithPeriod ? stem.slice(0, -1) : stem).trim();
   return `${body} ________${endsWithPeriod ? '.' : ''}`;
+}
+
+function ensureBlank(stem) {
+  return stem.includes('________') ? stem : appendBlank(stem);
+}
+
+// NITE's paired-answer format gives a stem two blanks and each option a
+// word for each ("entertain; make predictions"). A blank at the end of a
+// line leaves no trace - pdftotext trims the trailing run of spaces that
+// would have marked it - so the stem can come out one blank short of what
+// its options supply. Only applied where the stem already shows a blank:
+// that is what tells a fill-in-the-blank question apart from an ordinary
+// prose one whose options merely happen to contain a semicolon.
+// markBlanks() pads its marker with a space either side, which leaves a gap
+// before the sentence's closing punctuation whenever the blank is the last
+// thing in it. A space before punctuation is never right in English.
+function tidyStem(stem) {
+  return stem.replace(/ +([.,;:!?])/g, '$1');
+}
+
+function matchBlanksToOptions(stem, options) {
+  if (!stem.includes('________')) return stem;
+  const parts = options.map((o) => o.split(';').length);
+  if (parts[0] < 2 || !parts.every((n) => n === parts[0])) return stem;
+  let out = stem;
+  while ((out.match(/________/g) || []).length < parts[0]) out = appendBlank(out);
+  return out;
 }
 
 // If layout-mode extraction lost a blank's position entirely, table-mode
@@ -78,6 +104,24 @@ function recoverBlankFromTable(layoutStem, tableStem) {
   if (layoutWords.length !== tableWords.length - 1) return null;
   layoutWords.splice(blankIndex, 0, '________');
   return layoutWords.join(' ');
+}
+
+// A passage block runs to the "Questions" heading and an option block runs
+// to the next question, so both take in whatever page furniture sits in
+// between - the copyright notice, the "may not be copied" line, the page
+// footer. On a Hebrew-form sitting those are Hebrew, and these PDFs' fonts
+// carry no usable character map, so their letters extract as nothing and
+// leave a punctuation skeleton behind: )"( , the stray hyphens, "2023 - 38 -".
+// stripNoise() can't reach them - both its rules key on the English wording,
+// which isn't in the extraction at all - but prose always has a letter in
+// it, so requiring one clears them.
+const PROSE_RE = /[A-Za-z]/;
+
+function dropPageFurniture(block) {
+  return block
+    .split('\n')
+    .filter((line) => !line.trim() || PROSE_RE.test(line))
+    .join('\n');
 }
 
 function stripNoise(text) {
@@ -125,9 +169,10 @@ function splitEnglishSections(fullText) {
 
 function parseOptions(block) {
   const optRe = /\((\d)\)\s*([\s\S]*?)(?=\(\d\)|$)/g;
+  const prose = dropPageFurniture(block);
   const options = [];
   let m;
-  while ((m = optRe.exec(block))) {
+  while ((m = optRe.exec(prose))) {
     const num = Number(m[1]);
     if (num < 1 || num > 4) continue;
     const text = cleanText(m[2].replace(/\s+/g, ' ').trim());
@@ -191,7 +236,7 @@ function parseSimpleQuestions(block, { forceBlank = false, tableBlock = null, de
     }
     const options = parseOptions(body.slice(firstOptIdx));
     if (stem && options.length === 4) {
-      questions.push({ number, prompt: stem, options });
+      questions.push({ number, prompt: tidyStem(matchBlanksToOptions(stem, options)), options });
     }
   }
   return questions;
@@ -248,7 +293,7 @@ function splitParagraphs(rawBlock) {
     // so requiring one clears them - except on a marker line, which can
     // legitimately carry nothing but a year ("(25) 1999."). Scoped to the
     // passage: parseAnswerKey() needs the digit-only lines elsewhere.
-    .filter((l) => l.isMarker || /[A-Za-z]/.test(l.trimmed));
+    .filter((l) => l.isMarker || PROSE_RE.test(l.trimmed));
   if (!lines.length) return [];
 
   const baseline = continuationIndent(lines);

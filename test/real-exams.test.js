@@ -95,6 +95,12 @@ test('real NITE exams', { skip: !pdfs.length || !havePdftotext() ? 'no local exa
         }
         for (const s of [q.prompt, ...(q.passage || []), ...q.options]) {
           assert.doesNotMatch(s, /\uFFFD|Copyright by the National Institute|NATIONAL INSTITUTE FOR TESTING/);
+          // A Hebrew-form sitting's page furniture survives extraction as a
+          // letterless punctuation skeleton - )"( from the copyright notice,
+          // "- 2023 - 38 -" from the footer - which stripNoise() cannot match
+          // because both its rules key on the English wording.
+          assert.doesNotMatch(s, /\)"\(|-\s*(?:19|20)\d\d\s*-\s*\d+\s*-/,
+            `${q.section}${q.number} carries page furniture: ${s}`);
           // A real dash is always flanked by whitespace; a dash glued
           // mid-word means cleanText() mistook a lost accented letter for
           // one (see the Le\u00F3n/Mej\u00EDa bug).

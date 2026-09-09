@@ -282,6 +282,82 @@ test('splits a passage whose paragraphs open wider than their continuation lines
   ]);
 });
 
+test('an option does not absorb the page furniture printed after it', () => {
+  // The last question on a page is followed by the copyright notice and the
+  // page footer. On a Hebrew-form sitting their Hebrew extracts as nothing,
+  // leaving punctuation that option 4 - which runs to the end of the block -
+  // used to swallow whole.
+  const trailing =
+    '1. A good fixture helps a parser        hidden regressions.\n\n' +
+    '(1) detect\n(2) forbid\n(3) praise\n(4) recall\n' +
+    '                                        )"(        \u2013)\n' +
+    '        -     -   ,\n' +
+    '2023    - 37 -    -\n';
+
+  const exam = parse(FIXTURE.replace(/1\. A good fixture[\s\S]*?\(4\) recall\n/, trailing));
+  const q = exam.questions.find((x) => x.section === 'First' && x.number === 1);
+  assert.deepStrictEqual(q.options, ['detect', 'forbid', 'praise', 'recall']);
+});
+
+test('a paired-answer stem regains the blank trimmed off the end of its line', () => {
+  // NITE's two-blank format, taken verbatim from winter 2023's first
+  // section, question 21. The first blank survives as a mid-line gap; the
+  // second sits at the line end, where pdftotext trims the run of spaces
+  // down to one, so it left only "not ." behind. Each option supplying two
+  // words is what says a blank is missing.
+  const paired =
+    'Text I (Questions 6-8)\n\n' +
+    '(1) An invented passage with enough prose in it to read like a real one, and\n' +
+    '       a second line for it to wrap onto.\n\n' +
+    ' A second paragraph, so the passage splits the way a real one does.\n\n' +
+    'Questions\n\n' +
+    '6. It can be inferred from the text that science fiction writers want to  not .\n\n' +
+    '(1) entertain; make predictions\n' +
+    '(2) frighten readers; make them think about what is possible\n' +
+    '(3) influence the future of technology; sell a lot of books\n' +
+    '(4) shape reality; describe imaginary worlds\n\n' +
+    '7. Another question -\n\n' +
+    '(1) a\n(2) b\n(3) c\n(4) d\n\n' +
+    '8. A third question -\n\n' +
+    '(1) a\n(2) b\n(3) c\n(4) d\n\n';
+
+  const original = /Text I \(Questions 6-8\)[\s\S]*?\(4\) describe the dash\n/;
+  const q = parse(FIXTURE.replace(original, paired)).questions.find(
+    (x) => x.section === 'First' && x.number === 6
+  );
+  assert.strictEqual(
+    q.prompt,
+    'It can be inferred from the text that science fiction writers want to ________ not ________.'
+  );
+});
+
+test('a prose question is not given blanks just because its options carry semicolons', () => {
+  // spring 2019, second section, question 21: the options are full clauses
+  // that happen to contain a semicolon each. Its stem has no blank at all,
+  // which is what keeps the paired-answer rule off it.
+  const prose =
+    'Text I (Questions 6-8)\n\n' +
+    '(1) An invented passage with enough prose in it to read like a real one, and\n' +
+    '       a second line for it to wrap onto.\n\n' +
+    ' A second paragraph, so the passage splits the way a real one does.\n\n' +
+    'Questions\n\n' +
+    '6. Which of the following statements might be made by an Iroquois man?\n\n' +
+    '(1) My mother is of the turtle clan; therefore, my son is of the bear clan.\n' +
+    '(2) My father is of the wolf clan; therefore, my daughter is of the wolf clan.\n' +
+    '(3) My mother is of the turtle clan; therefore, my son is of the turtle clan.\n' +
+    '(4) I am of the turtle clan; therefore, my daughter is of the turtle clan.\n\n' +
+    '7. Another question -\n\n' +
+    '(1) a\n(2) b\n(3) c\n(4) d\n\n' +
+    '8. A third question -\n\n' +
+    '(1) a\n(2) b\n(3) c\n(4) d\n\n';
+
+  const original = /Text I \(Questions 6-8\)[\s\S]*?\(4\) describe the dash\n/;
+  const q = parse(FIXTURE.replace(original, prose)).questions.find(
+    (x) => x.section === 'First' && x.number === 6
+  );
+  assert.strictEqual(q.prompt, 'Which of the following statements might be made by an Iroquois man?');
+});
+
 test('drops the page furniture a Hebrew-form sitting leaves at the end of a passage', () => {
   // A passage block runs to the "Questions" heading, so it swallows the
   // copyright notice, the 'may not be copied' line and the page footer in
