@@ -427,21 +427,63 @@ test('does not fragment a passage when its continuation indent drifts across a p
   assert.match(q.passage[0], /rest of the paragraph\.$/);
 });
 
+test('recovers a blank at a line-wrap boundary from layout mode, with no table to fall back on', () => {
+  // summer 2025, second section, question 5: the blank is the first thing
+  // on the wrapped line, so it leaves no mid-line gap - only a leading
+  // indent of 14 where an ordinary wrap in that block sits at 7. Table
+  // mode renders the same wrap at its ordinary 4, so the cross-reference
+  // cannot recover this one and the blank used to land at the very end
+  // ("...found in along the Nile river ________.").
+  const wrapBlank =
+    '1. The ancient Egyptians had numerous uses for natron, a mixture of various salts found in\n\n' +
+    '              along the Nile river.\n\n' +
+    '(1) abundance\n(2) endurance\n(3) competence\n(4) defiance\n';
+  const ordinaryWrap =
+    '2. The invented sample text is the        of the real exam layout, wrapped\n\n' +
+    '       onto a second line at the usual indent, and then onto a third\n\n' +
+    "       line as well, so the block's ordinary wrap indent is measurable.\n\n" +
+    '(1) forecaster\n(2) mirror\n(3) inspector\n(4) publisher\n';
+
+  const layoutText = FIXTURE.replace(/1\. A good fixture[\s\S]*?\(4\) recall\n/, `${wrapBlank}\n`)
+    .replace(/2\. The invented sample text[\s\S]*?\(4\) publisher\n/, ordinaryWrap);
+
+  const q = parse(layoutText).questions.find((x) => x.section === 'First' && x.number === 1);
+  assert.strictEqual(
+    q.prompt,
+    'The ancient Egyptians had numerous uses for natron, a mixture of various salts ' +
+      'found in ________ along the Nile river.'
+  );
+});
+
 test('recovers a blank that falls exactly at a line-wrap boundary via table-mode indent', () => {
+  // Question 2 gets an ordinary two-line wrap purely so the block has a
+  // baseline to measure question 1's wrap against; a block whose only
+  // wrapped line is the blank itself can't be calibrated, and the parser
+  // correctly declines to guess there.
+  const ordinaryWrap = (indent) =>
+    '2. The invented sample text is the        of the real exam layout, wrapped\n\n' +
+    `${indent}onto a second line at the usual indent, and then onto a third\n\n` +
+    `${indent}line as well, so the block's ordinary wrap indent is measurable.\n\n` +
+    '(1) forecaster\n(2) mirror\n(3) inspector\n(4) publisher\n';
+  const question2 = /2\. The invented sample text[\s\S]*?\(4\) publisher\n/;
+
   const swallowed =
     '1. The Fugger family, prominent bankers, used some of the wealth they had\n\n' +
     '       to build a housing project for the working poor.\n\n' +
     '(1) discouraged\n(2) accumulated\n(3) scheduled\n(4) consoled\n';
-  const layoutText = FIXTURE.replace(/1\. A good fixture[\s\S]*?\(4\) recall\n/, `${swallowed}\n`);
+  const layoutText = FIXTURE.replace(/1\. A good fixture[\s\S]*?\(4\) recall\n/, `${swallowed}\n`)
+    .replace(question2, ordinaryWrap('       '));
 
-  // Table mode keeps a wrapped line's leading indent at a consistent ~4
-  // baseline for an ordinary wrap; when the blank itself is the wrapped
-  // line's first word, its width pushes that indent out much further.
+  // Layout mode puts question 1's wrap at the same indent as an ordinary
+  // one, so nothing there marks it as a blank. Table mode keeps ordinary
+  // wraps at a consistent ~4 and pushes this one out to 11, which is the
+  // signal the cross-reference recovers the position from.
   const tableSwallowed =
     '1. The Fugger family, prominent bankers, used some of the wealth they had\n\n' +
     '           to build a housing project for the working poor.\n\n' +
     '(1) discouraged\n(2) accumulated\n(3) scheduled\n(4) consoled\n';
-  const tableText = FIXTURE.replace(/1\. A good fixture[\s\S]*?\(4\) recall\n/, `${tableSwallowed}\n`);
+  const tableText = FIXTURE.replace(/1\. A good fixture[\s\S]*?\(4\) recall\n/, `${tableSwallowed}\n`)
+    .replace(question2, ordinaryWrap('    '));
 
   const q = parse(layoutText, tableText).questions.find((x) => x.section === 'First' && x.number === 1);
   assert.strictEqual(

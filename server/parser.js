@@ -17,29 +17,25 @@ function cleanText(text) {
 
 // pdftotext renders a sentence-completion blank as extra inline whitespace
 // (the underline is a drawn line, not text), so a mid-line run of 2+ spaces
-// is a blank. Leading indentation from a wrapped continuation line is not
-// (nothing precedes it on that line), so it's left alone by default.
+// is a blank.
 //
-// detectWrapBlanks is an opt-in used only for table-mode (pdftotext -table)
-// cross-referencing, never the primary layout-mode extraction. In table
-// mode specifically, a continuation line's leading indent stays at a
-// consistent ~4-space baseline for an ordinary wrap - but when the blank
-// itself is the first word of the wrapped line, its width pushes that
-// baseline out to 7+ spaces, a reliably distinct signal validated against
-// real exams. (Layout mode has no such reliable signal - its indent
-// reconstruction doesn't track blank width the same way - which is why
-// this stays off there.)
-const WRAP_BLANK_INDENT_THRESHOLD = 7;
-
-function markBlanks(text, { detectWrapBlanks = false } = {}) {
+// A blank landing exactly on a line-wrap boundary leaves no such gap: it
+// becomes extra *leading* whitespace on the wrapped line instead. Ordinary
+// wraps are indented too, so what marks it out is an indent wider than the
+// block's own usual one - 14 against 7 in layout mode, 11 against 4 in
+// table mode. Hence a measured baseline rather than a fixed column: the
+// two extractions don't agree on one, and passing no baseline leaves
+// leading indentation alone entirely (the right default for restatement
+// and reading-comprehension stems, which have no blank to find).
+function markBlanks(text, { wrapIndent = null } = {}) {
   return text
     .split('\n')
     .map((line, i) => {
       const marked = line.replace(/(\S) {2,}(?=\S)/g, '$1 ________ ');
-      if (!detectWrapBlanks || i === 0 || marked.includes('________')) return marked;
+      if (!wrapIndent || i === 0 || marked.includes('________')) return marked;
       const trimmed = line.trimStart();
       const leading = line.length - trimmed.length;
-      return leading >= WRAP_BLANK_INDENT_THRESHOLD ? `________ ${trimmed}` : marked;
+      return leading > wrapIndent ? `________ ${trimmed}` : marked;
     })
     .join('\n');
 }
@@ -140,18 +136,54 @@ function parseOptions(block) {
   return options;
 }
 
+const QUESTION_RE = /(^|\n)\s*(\d{1,2})\.\s([\s\S]*?)(?=\n\s*\d{1,2}\.\s|$)/;
+const OPTION_ONE_RE = /\(1\)/;
+
+function dominantIndent(leadings) {
+  const counts = new Map();
+  for (const leading of leadings) counts.set(leading, (counts.get(leading) || 0) + 1);
+  let best = 0;
+  let bestCount = 0;
+  for (const [leading, count] of counts) {
+    if (count > bestCount) {
+      best = leading;
+      bestCount = count;
+    }
+  }
+  return best;
+}
+
+// The indent an ordinary wrapped stem line sits at in this block, which is
+// what markBlanks() measures a blank-at-the-wrap against. Taken over every
+// question's stem at once: a single question can wrap only the once, and
+// that one wrap may be the blank itself.
+function stemWrapIndent(block) {
+  const leadings = [];
+  const qRe = new RegExp(QUESTION_RE, 'g');
+  let m;
+  while ((m = qRe.exec(block))) {
+    const firstOptIdx = m[3].search(OPTION_ONE_RE);
+    if (firstOptIdx === -1) continue;
+    for (const line of m[3].slice(0, firstOptIdx).split('\n').slice(1)) {
+      if (line.trim()) leadings.push(line.length - line.trimStart().length);
+    }
+  }
+  return dominantIndent(leadings) || null;
+}
+
 function parseSimpleQuestions(block, { forceBlank = false, tableBlock = null, detectWrapBlanks = false } = {}) {
   const tableStems = tableBlock ? indexStemsByNumber(tableBlock) : null;
+  const wrapIndent = detectWrapBlanks ? stemWrapIndent(block) : null;
   const questions = [];
-  const qRe = /(^|\n)\s*(\d{1,2})\.\s([\s\S]*?)(?=\n\s*\d{1,2}\.\s|$)/g;
+  const qRe = new RegExp(QUESTION_RE, 'g');
   let m;
   while ((m = qRe.exec(block))) {
     const number = Number(m[2]);
     const body = m[3];
-    const firstOptIdx = body.search(/\(1\)/);
+    const firstOptIdx = body.search(OPTION_ONE_RE);
     if (firstOptIdx === -1) continue;
     let stem = normalizeNativeBlanks(
-      cleanText(markBlanks(body.slice(0, firstOptIdx), { detectWrapBlanks }).replace(/\s+/g, ' ').trim())
+      cleanText(markBlanks(body.slice(0, firstOptIdx), { wrapIndent }).replace(/\s+/g, ' ').trim())
     );
     if (forceBlank && stem && !stem.includes('________')) {
       const recovered = tableStems && recoverBlankFromTable(stem, tableStems.get(number));
@@ -184,20 +216,7 @@ function indexStemsByNumber(block) {
 const CONTINUATION_INDENT_DRIFT = 1;
 
 function continuationIndent(lines) {
-  const counts = new Map();
-  for (const line of lines) {
-    if (line.isMarker) continue;
-    counts.set(line.leading, (counts.get(line.leading) || 0) + 1);
-  }
-  let best = 0;
-  let bestCount = 0;
-  for (const [leading, count] of counts) {
-    if (count > bestCount) {
-      best = leading;
-      bestCount = count;
-    }
-  }
-  return best;
+  return dominantIndent(lines.filter((l) => !l.isMarker).map((l) => l.leading));
 }
 
 // A line-number marker always sits at column 0, whether it falls mid-
@@ -294,7 +313,7 @@ function parseSection(rawSectionText, label, tableSectionText) {
 
   const questions = [];
   if (scMatch) {
-    for (const q of parseSimpleQuestions(scMatch[1], { forceBlank: true, tableBlock: tableScBlock })) {
+    for (const q of parseSimpleQuestions(scMatch[1], { forceBlank: true, tableBlock: tableScBlock, detectWrapBlanks: true })) {
       questions.push({ ...q, type: 'sentence-completion', section: label });
     }
   }
