@@ -282,6 +282,58 @@ test('splits a passage whose paragraphs open wider than their continuation lines
   ]);
 });
 
+test('drops the page furniture a Hebrew-form sitting leaves at the end of a passage', () => {
+  // A passage block runs to the "Questions" heading, so it swallows the
+  // copyright notice, the 'may not be copied' line and the page footer in
+  // between. On a Hebrew-form sitting those are Hebrew, and these PDFs’ fonts
+  // carry no usable character map, so the letters extract as nothing and only
+  // a punctuation skeleton is left - which reads as three more paragraphs.
+  const trailingFurniture =
+    'Text I (Questions 6-8)\n\n' +
+    '(1) This is the whole of an invented passage, which ends properly here.\n\n' +
+    '                                        )"(        –)\n' +
+    '        -     -   ,\n' +
+    '2025    - 40 -    -\n\n' +
+    'Questions\n\n' +
+    '6. A question about the passage -\n\n' +
+    '(1) a\n(2) b\n(3) c\n(4) d\n\n' +
+    '7. Another question -\n\n' +
+    '(1) a\n(2) b\n(3) c\n(4) d\n\n' +
+    '8. A third question -\n\n' +
+    '(1) a\n(2) b\n(3) c\n(4) d\n\n';
+
+  const original = /Text I \(Questions 6-8\)[\s\S]*?\(4\) describe the dash\n/;
+  const exam = parse(FIXTURE.replace(original, trailingFurniture));
+  const q = exam.questions.find((x) => x.section === 'First' && x.number === 6);
+
+  assert.deepStrictEqual(q.passage, [
+    '[[1]] This is the whole of an invented passage, which ends properly here.',
+  ]);
+});
+
+test('keeps a marker line whose only content is a year, not just page furniture', () => {
+  // "(25) 1999." is the real last line of summer 2026's first passage. It
+  // has no letter in it either, so the furniture filter has to let a marker
+  // line through or it truncates the passage mid-sentence.
+  const yearEnding =
+    'Text I (Questions 6-8)\n\n' +
+    '(1) She received the prestigious Kennedy Center Honors in 1996 and the\n' +
+    '       National Medal of the Arts in\n\n' +
+    '(25) 1999.\n\n' +
+    'Questions\n\n' +
+    '6. A question about the passage -\n\n' +
+    '(1) a\n(2) b\n(3) c\n(4) d\n\n' +
+    '7. Another question -\n\n' +
+    '(1) a\n(2) b\n(3) c\n(4) d\n\n' +
+    '8. A third question -\n\n' +
+    '(1) a\n(2) b\n(3) c\n(4) d\n\n';
+
+  const original = /Text I \(Questions 6-8\)[\s\S]*?\(4\) describe the dash\n/;
+  const exam = parse(FIXTURE.replace(original, yearEnding));
+  const q = exam.questions.find((x) => x.section === 'First' && x.number === 6);
+
+  assert.match(q.passage.join(' '), /National Medal of the Arts in \[\[25\]\] 1999\.$/);
+});
 test('detects a paragraph break that lands exactly on a line-number marker', () => {
   // NITE's line-number markers land every 5 lines regardless of paragraph
   // structure, independent of where paragraphs actually break. A marker

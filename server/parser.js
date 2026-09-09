@@ -218,7 +218,18 @@ function splitParagraphs(rawBlock) {
       return { leading: stripped.length - stripped.trimStart().length, trimmed };
     })
     .filter((l) => l.trimmed.length > 0)
-    .map((l) => ({ ...l, isMarker: /^\(\d+\)/.test(l.trimmed) }));
+    .map((l) => ({ ...l, isMarker: /^\(\d+\)/.test(l.trimmed) }))
+    // A passage block runs to the "Questions" heading, so on a Hebrew-form
+    // sitting it swallows the page furniture in between - copyright notice,
+    // "may not be copied", page footer. Their Hebrew does not survive
+    // extraction (these PDFs' fonts carry no usable character map), leaving
+    // a punctuation skeleton like )"( or 2025 - 40 - that reads as three
+    // more paragraphs. stripNoise() cannot catch those: it matches the
+    // English wording, which is not there. Prose always has a letter in it,
+    // so requiring one clears them - except on a marker line, which can
+    // legitimately carry nothing but a year ("(25) 1999."). Scoped to the
+    // passage: parseAnswerKey() needs the digit-only lines elsewhere.
+    .filter((l) => l.isMarker || /[A-Za-z]/.test(l.trimmed));
   if (!lines.length) return [];
 
   const baseline = continuationIndent(lines);
