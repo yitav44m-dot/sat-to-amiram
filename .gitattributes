@@ -1,0 +1,4 @@
+# The parser test fixtures are matched with LF-anchored regexes, so a
+# CRLF checkout (core.autocrlf on Windows) breaks 13 tests on a fresh
+# clone. Normalize to LF in the repo and on checkout, on every platform.
+* text=auto eol=lf
