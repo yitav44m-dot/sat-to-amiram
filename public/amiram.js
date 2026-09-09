@@ -54,15 +54,75 @@ const PART_SECONDS = {
   'reading-comprehension': 15 * 60,
 };
 
+function samePassage(a, b) {
+  return a.length === b.length && a.every((paragraph, i) => paragraph === b[i]);
+}
+
 function groupPassages(questions) {
   const texts = [];
   questions.forEach((q, index) => {
     if (q.type !== 'reading-comprehension') return;
     const current = texts[texts.length - 1];
-    if (current && current.passage === q.passage) current.indices.push(index);
-    else texts.push({ passage: q.passage, indices: [index] });
+    // Content comparison, not reference equality: a cached exam is reloaded
+    // from JSON, which always creates fresh array instances even for
+    // questions that shared the exact same passage before being cached.
+    if (current && samePassage(current.passage, q.passage)) current.indices.push(index);
+    else texts.push({ section: q.section, passage: q.passage, indices: [index] });
   });
   return texts;
+}
+
+// A NITE exam carries four texts - two per section - and the simulation has
+// room for one. The pool is each section's *second* text, picked at random so
+// repeated runs of the same exam don't always drill the same passage. A pool
+// with no second text anywhere (a partial exam) falls back to what's there.
+function takeReadingText(texts) {
+  const perSection = new Map();
+  const secondOfSection = texts.filter((text) => {
+    const nth = (perSection.get(text.section) || 0) + 1;
+    perSection.set(text.section, nth);
+    return nth === 2;
+  });
+  const pool = secondOfSection.length ? secondOfSection : texts;
+  const pick = pool[Math.floor(Math.random() * pool.length)];
+  if (pick) texts.splice(texts.indexOf(pick), 1);
+  return pick;
+}
+
+const slotsFor = (type) =>
+  PART_TEMPLATE.filter((spec) => spec.type === type).reduce((total, spec) => total + spec.size, 0);
+
+const RESTATEMENT_SLOTS = slotsFor('restatement');
+const SENTENCE_COMPLETION_SLOTS = slotsFor('sentence-completion');
+
+// Three sentence-completion chapters need twelve questions and an exam holds
+// sixteen, eight per section: the first two chapters take the first section
+// whole, and the sixth - the only one drawn from the second section - takes
+// its 5-8 rather than its 1-4. So the surplus comes off the front of the last
+// section that contributes, leaving its tail.
+function dropSurplusFromFinalSection(indices, questions, slots) {
+  const surplus = indices.length - slots;
+  if (surplus <= 0) return indices;
+  const finalSection = questions[indices[indices.length - 1]].section;
+  const start = indices.findIndex((index) => questions[index].section === finalSection);
+  return [...indices.slice(0, start), ...indices.slice(start + surplus)];
+}
+
+// Each section holds four restatements (9-12) and the simulation has room for
+// six, so the opener of each section is left out: the chapters get 10-12 from
+// the first section and 10-12 from the second. Dropped by position rather than
+// by the number 9 so a sitting that numbers them differently still works, and
+// only while enough remain to fill the chapters - a short exam is better dealt
+// whole than starved for the sake of the rule.
+function dropFirstOfEachSection(indices, questions) {
+  const seen = new Set();
+  const kept = indices.filter((index) => {
+    const { section } = questions[index];
+    if (seen.has(section)) return true;
+    seen.add(section);
+    return false;
+  });
+  return kept.length >= RESTATEMENT_SLOTS ? kept : indices;
 }
 
 // Deals the parsed exam into the six Amiram chapters, one pass through the
@@ -77,6 +137,12 @@ function buildParts(questions) {
   questions.forEach((q, index) => {
     if (pools[q.type]) pools[q.type].push(index);
   });
+  pools.restatement = dropFirstOfEachSection(pools.restatement, questions);
+  pools['sentence-completion'] = dropSurplusFromFinalSection(
+    pools['sentence-completion'],
+    questions,
+    SENTENCE_COMPLETION_SLOTS
+  );
   const texts = groupPassages(questions);
 
   const parts = [];
@@ -96,7 +162,7 @@ function buildParts(questions) {
 
   for (const spec of PART_TEMPLATE) {
     if (spec.type === 'reading-comprehension') {
-      const text = texts.shift();
+      const text = takeReadingText(texts);
       if (text) push(spec.type, text.indices, text.passage);
       continue;
     }
@@ -108,4 +174,15 @@ function buildParts(questions) {
   return parts;
 }
 
-if (typeof module !== 'undefined') module.exports = { buildParts, PART_TYPES, PART_TEMPLATE };
+// Non-adaptive Amirnet scoring: every mandatory question carries equal
+// weight regardless of position or difficulty. The proportion of correct
+// answers out of the mandatory total is mapped onto the 50-150 scale.
+function amirnetScore(correctCount, totalMandatory) {
+  if (!totalMandatory) return 50;
+  const raw = 50 + (correctCount / totalMandatory) * 100;
+  return Math.min(150, Math.max(50, Math.round(raw)));
+}
+
+if (typeof module !== 'undefined') {
+  module.exports = { buildParts, PART_TYPES, PART_TEMPLATE, amirnetScore };
+}

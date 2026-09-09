@@ -99,6 +99,35 @@ select, input[type="number"] {
 .status { margin: 16px 0 0; color: var(--muted); font-size: 0.9rem; min-height: 1.2em; }
 .status.error { color: var(--wrong); }
 
+.loading-bar {
+  margin: 16px auto 0;
+  max-width: 320px;
+}
+
+.loading-bar-label {
+  display: block;
+  margin: 0 0 6px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--green-deep);
+}
+
+.loading-bar-track {
+  height: 10px;
+  background: var(--green-soft);
+  border: 1px solid #d9f0e3;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.loading-bar-fill {
+  height: 100%;
+  width: 0%;
+  background: var(--green);
+  border-radius: 999px;
+  transition: width 0.25s ease;
+}
+
 /* ---------- control panel ---------- */
 
 .panel-top {
@@ -246,6 +275,26 @@ select, input[type="number"] {
   line-height: 1.75;
 }
 
+.passage-text p {
+  margin: 0 0 14px;
+  text-indent: 1.5em;
+}
+
+.passage-text p:last-child {
+  margin-bottom: 0;
+}
+
+.line-marker {
+  display: inline-block;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--muted);
+  vertical-align: super;
+  line-height: 0;
+  margin-inline-end: 2px;
+  user-select: none;
+}
+
 .q-stem p { text-align: center; }
 
 .speak {
@@ -290,9 +339,46 @@ select, input[type="number"] {
 
 /* ---------- results ---------- */
 
-.results h2 { margin: 0 0 8px; font-size: 1.3rem; }
-.score-summary { margin: 0 0 6px; font-size: 1.05rem; color: var(--muted); }
-.score-summary b { color: var(--green-deep); font-size: 1.35rem; }
+.score-card {
+  background: var(--green-soft);
+  border: 1px solid #d9f0e3;
+  border-radius: 16px;
+  padding: 22px 22px 26px;
+  margin-bottom: 24px;
+}
+
+.score-card-title {
+  margin: 0 0 18px;
+  text-align: center;
+  font-size: 1.2rem;
+}
+
+.score-box {
+  background: var(--card);
+  border-radius: 12px;
+  padding: 20px 16px 18px;
+  text-align: center;
+}
+
+.score-value { font-size: 2.6rem; font-weight: 800; color: var(--green-deep); line-height: 1; }
+.score-caption { margin: 8px 0 2px; font-size: 0.9rem; color: var(--text); }
+.score-detail { margin: 0; font-size: 0.8rem; color: var(--muted); }
+
+.score-stats {
+  display: flex;
+  margin-top: 18px;
+  text-align: center;
+}
+
+.score-stat {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.score-stat-value { font-size: 1.3rem; font-weight: 700; color: var(--text); }
+.score-stat-label { font-size: 0.78rem; color: var(--muted); }
 
 .review-part { margin-top: 22px; }
 

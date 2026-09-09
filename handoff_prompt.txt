@@ -1,0 +1,39 @@
+I'm continuing work on a project called "SAT to Amiram" — a local web app that lets me practice the English section of Israel's Psychometric Entrance Test (the "Psychometri," administered by NITE, the National Institute for Testing and Evaluation). Repo: https://github.com/yitav44m-dot/sat-to-amiram
+
+WHAT IT DOES
+I pick a season (winter/spring/summer/autumn) and year in a browser UI. The server fetches NITE's public combined-subject English-language exam PDF for that sitting, extracts just the English section (Sentence Completion, Restatement, Reading Comprehension questions), and serves it as an interactive multiple-choice quiz with scoring against the real answer key.
+
+TECH STACK
+- Plain Node.js (no Express, no npm dependencies) — uses Node 18+ built-in `fetch` and `node:http`.
+- `pdftotext` (poppler-utils, from mingw64/Git Bash on this Windows machine) is a required external binary — the server shells out to it via `child_process.execFile`.
+- Frontend is vanilla HTML/CSS/JS in `public/`.
+
+FILE LAYOUT
+- `server/index.js` — HTTP server, serves static files + `/api/exam?season=X&year=Y` endpoint, caches parsed exams to `data/exams/{season}_{year}.json` and PDFs to `data/pdfs/{season}_{year}.pdf`.
+- `server/fetchExam.js` — builds candidate NITE URLs and downloads the PDF.
+- `server/parser.js` — parses `pdftotext -layout` output into structured questions + answer key.
+- `public/index.html`, `public/app.js`, `public/styles.css` — quiz UI (pick exam → answer questions one at a time → results/review screen).
+- `data/pdfs/` and `data/exams/` are gitignored (only `.gitkeep` committed) — I deliberately do NOT commit NITE's copyrighted exam PDFs or extracted question text to the public repo.
+
+KEY RESEARCH FINDINGS ABOUT NITE'S PDF ARCHIVE (already verified by fetching real files)
+- Base URL pattern: `https://www.nite.org.il/wp-content/uploads/{upload_year}/{upload_month}/psychometric_{season}_{year}_EN_acc.pdf` (sometimes without the `_acc` suffix). No login required — plain static files.
+- NITE only publishes the English-language combined form for SOME sittings — roughly once or twice a year (Hebrew forms are published far more often). So many season/year combos will simply have no English PDF available. The app tries several plausible upload-month/year guesses (`server/fetchExam.js`'s `SEASON_MONTHS` map and `candidateUrls()`) and does a HEAD request per candidate; if none succeed it returns a clear error.
+- Confirmed working example: `https://www.nite.org.il/wp-content/uploads/2025/08/psychometric_summer_2025_EN_acc.pdf`
+- Within a combined-language PDF, subjects appear in a fixed order: Verbal Reasoning (First+Second sections) → Quantitative Reasoning (First+Second) → English (First+Second). Each English section has 22 questions: Sentence Completion (Q1-8), Restatement (Q9-12), Reading Comprehension with two passages "Text I" and "Text II" (Q13-17, Q18-22). An answer key table near the end of the PDF (~page 118) gives correct answers as a digit string per section, e.g. `English – First Section ... correct answer 4113334134343111332414`.
+
+PDF-TEXT-EXTRACTION QUIRKS ALREADY HANDLED IN `parser.js`
+- `pdftotext -layout` mangles em/en-dashes into a `�` replacement character — cleaned up via a `cleanText()` helper that swaps it for a real en-dash.
+- Page-footer boilerplate ("Copyright by the National Institute...", repeated "English – First Section - NN - Summer 2025" lines, standalone page numbers) is stripped by regex before parsing.
+- The trailing appendix after the English questions (essay/writing-task pages, blank answer-sheet grids with "NATIONAL INSTITUTE FOR TESTING & EVALUATION" bubble-sheet text) has to be truncated off BEFORE parsing the last Reading Comprehension question's options, otherwise the last option's text balloons to include thousands of characters of that appendix. Currently truncated at the first occurrence of `NAME A I.D. No.` or `NATIONAL INSTITUTE FOR TESTING & EVALUATION`.
+- One rare but real quirk (seen in the summer 2024 exam): occasionally the "Questions" heading that separates a reading passage from its question list has stray column-wrapped text glued onto the same line (e.g. "Questions                    than the use of X-ray"), which originally caused the whole passage's question block to fail to parse and silently drop 5 questions. Fixed by loosening the regex boundary from `Questions\s*\n` to `\nQuestions\b[^\n]*\n` — this recovers all the questions but can leave a small chunk of the stem text slightly out of order/missing in that rare case. This was a deliberate "good enough" tradeoff, not a rigorous fix — worth revisiting if more exams show worse artifacts.
+- Verified against two real downloaded exams (summer 2025 and summer 2024): both now parse cleanly to the full 44/44 questions with correct answer keys attached.
+
+KNOWN LIMITATIONS / OPEN ITEMS
+- No automated test suite yet — validation so far was manual, by downloading real PDFs and inspecting parser output in the terminal.
+- The season→upload-month guessing heuristic in `candidateUrls()` is unverified beyond the two sittings I actually tested; NITE's upload folder dates don't perfectly correlate with exam season (their own re-uploads/reorganizations were observed to be inconsistent), so fetches for other seasons/years may need the guess list tweaked.
+- No README was written (per my own working style: don't create docs unless asked) — this prompt is effectively the missing documentation.
+- The frontend has no timer, though NITE's real English section is timed (20 minutes for 22 questions) — could be added if useful.
+- `gh` CLI is now installed on this machine and authenticated could not be completed via device-code flow (it kept hanging); the repo was ultimately created and code pushed using a GitHub personal access token via direct REST API + a transient git http.extraheader (not saved to git config, so no secret is persisted anywhere in the repo or its config).
+
+WHAT I'D LIKE HELP WITH NEXT
+(fill this in based on what you actually want — e.g., "add a timer", "handle more exam seasons", "write tests for the parser", "add a Hebrew-section mode", etc.)

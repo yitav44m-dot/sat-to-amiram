@@ -4,8 +4,9 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const { URL } = require('url');
-const { getExamRawText } = require('./fetchExam');
-const { parseEnglishExam } = require('./parser');
+const { getExamRawText, NoExamPdfError } = require('./fetchExam');
+const { parseEnglishExam, NoEnglishSectionError } = require('./parser');
+const { getKidumAnswerKey } = require('./kidum');
 
 const PORT = process.env.PORT || 3000;
 const PUBLIC_DIR = path.join(__dirname, '..', 'public');
@@ -33,6 +34,37 @@ function serveStatic(req, res) {
   });
 }
 
+// NITE's Hebrew-administered exam form has no machine-readable answer key
+// of its own (see server/kidum.js), so when parseEnglishExam finds none at
+// all, fall back to kidum.com's own worked-solution PDF for this sitting.
+async function applyKidumFallback(exam, season, year) {
+  const hasKey = exam.questions.some((q) => q.correctIndex !== null);
+  if (hasKey) return exam;
+
+  const kidumKey = await getKidumAnswerKey(season, year).catch(() => null);
+  if (!kidumKey) return exam;
+
+  exam.questions = exam.questions.map((q) => {
+    const digit = kidumKey[q.section]?.[q.number - 1];
+    return digit ? { ...q, correctIndex: digit - 1 } : q;
+  });
+  return exam;
+}
+
+// The picker shows the error verbatim, so the two ways a sitting can
+// legitimately be unavailable get real Hebrew text rather than a parser
+// internal. Anything else is a bug and keeps its own message, which is
+// far more useful in the browser than a generic apology.
+function userMessage(err) {
+  if (err instanceof NoEnglishSectionError) {
+    return 'הטופס שפרסם מאל"ו למועד זה אינו כולל פרק אנגלית. בחר מועד אחר.';
+  }
+  if (err instanceof NoExamPdfError) {
+    return 'לא נמצאה בחינה למועד זה. מאל"ו מפרסם בחינות לחלק מהמועדים בלבד.';
+  }
+  return err.message;
+}
+
 async function handleExamRequest(query, res) {
   const season = (query.get('season') || '').toLowerCase();
   const year = Number(query.get('year'));
@@ -44,25 +76,34 @@ async function handleExamRequest(query, res) {
     return;
   }
 
+  // Streamed as newline-delimited JSON so the client can show real fetch/
+  // parse progress instead of a fake animation. The HTTP status is always
+  // 200 once streaming starts (it can't change mid-stream); success/failure
+  // is carried by the "done"/"error" line instead.
+  res.writeHead(200, { 'Content-Type': 'application/x-ndjson; charset=utf-8' });
+  const sendProgress = (progress) => res.write(JSON.stringify({ progress }) + '\n');
+
   const cachePath = path.join(EXAMS_DIR, `${season}_${year}.json`);
   try {
     if (fs.existsSync(cachePath)) {
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(fs.readFileSync(cachePath, 'utf8'));
+      const exam = JSON.parse(fs.readFileSync(cachePath, 'utf8'));
+      res.end(JSON.stringify({ progress: 100, exam }) + '\n');
       return;
     }
 
-    const rawText = await getExamRawText(season, year);
-    const exam = parseEnglishExam(rawText, { season, year });
+    sendProgress(2);
+    const { layoutText, tableText } = await getExamRawText(season, year, sendProgress);
+    sendProgress(92);
+    let exam = parseEnglishExam(layoutText, { season, year }, tableText);
+    exam = await applyKidumFallback(exam, season, year);
+    sendProgress(97);
 
     fs.mkdirSync(EXAMS_DIR, { recursive: true });
     fs.writeFileSync(cachePath, JSON.stringify(exam));
 
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify(exam));
+    res.end(JSON.stringify({ progress: 100, exam }) + '\n');
   } catch (err) {
-    res.writeHead(502, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: err.message }));
+    res.end(JSON.stringify({ error: userMessage(err) }) + '\n');
   }
 }
 

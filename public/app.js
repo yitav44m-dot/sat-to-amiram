@@ -21,6 +21,35 @@ function svg(name) {
   );
 }
 
+// The parser embeds NITE's own original line numbers (printed every 5 lines
+// in the source, and sometimes referenced by RC questions, e.g. "the word
+// in line 12") as "[[N]] " markers inline in the passage text. Render them
+// as small badges instead of raw brackets.
+const LINE_MARKER_RE = /\[\[(\d+)\]\]\s?/g;
+
+function appendPassageText(container, text) {
+  LINE_MARKER_RE.lastIndex = 0;
+  let lastIndex = 0;
+  let match;
+  while ((match = LINE_MARKER_RE.exec(text))) {
+    if (match.index > lastIndex) {
+      container.appendChild(document.createTextNode(text.slice(lastIndex, match.index)));
+    }
+    const marker = document.createElement('span');
+    marker.className = 'line-marker';
+    marker.textContent = match[1];
+    container.appendChild(marker);
+    lastIndex = LINE_MARKER_RE.lastIndex;
+  }
+  if (lastIndex < text.length) {
+    container.appendChild(document.createTextNode(text.slice(lastIndex)));
+  }
+}
+
+function stripLineMarkers(text) {
+  return text.replace(LINE_MARKER_RE, '');
+}
+
 const state = {
   exam: null,
   parts: [],
@@ -33,13 +62,14 @@ const state = {
 
 const el = {};
 [
-  'picker', 'season', 'year', 'load-btn', 'status',
+  'picker', 'season', 'year', 'load-btn', 'status', 'loading-bar', 'loading-bar-fill',
   'control', 'part-now', 'part-total', 'part-tabs', 'part-title', 'part-sub',
   'timer-icon', 'timer-value', 'q-now', 'q-total', 'q-pills',
   'prev-btn', 'next-btn', 'finish-part-btn',
   'question-card', 'q-instruction', 'passage-box', 'passage-text', 'passage-speak',
   'q-stem-text', 'stem-speak', 'q-options',
-  'results', 'score-summary', 'review', 'restart-btn',
+  'results', 'score-value', 'score-detail', 'stat-minutes', 'stat-questions', 'stat-correct',
+  'review', 'restart-btn',
 ].forEach((id) => {
   el[id] = document.getElementById(id);
 });
@@ -50,7 +80,10 @@ el['next-btn'].addEventListener('click', () => goToQuestion(state.questionIndex 
 el['finish-part-btn'].addEventListener('click', finishPart);
 el['restart-btn'].addEventListener('click', () => location.reload());
 el['stem-speak'].addEventListener('click', () => speak(el['q-stem-text'].textContent));
-el['passage-speak'].addEventListener('click', () => speak(el['passage-text'].textContent));
+el['passage-speak'].addEventListener('click', () => {
+  const part = state.parts[state.partIndex];
+  speak((part.passage || []).map(stripLineMarkers).join('\n\n'));
+});
 
 el['timer-icon'].innerHTML = svg('timer');
 el['stem-speak'].innerHTML = svg('speaker');
@@ -65,24 +98,70 @@ function speak(text) {
   window.speechSynthesis.speak(utterance);
 }
 
+function setLoadingProgress(percent) {
+  el['loading-bar-fill'].style.width = `${Math.max(0, Math.min(100, percent))}%`;
+}
+
+// The server streams newline-delimited JSON progress lines ({"progress": N})
+// while it locates the NITE PDF, downloads it, and runs pdftotext, ending in
+// either {"progress":100,"exam":{...}} or {"error":"..."}. This drives the
+// loading bar off real backend state instead of a fake animation.
+async function readExamStream(res) {
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let exam = null;
+  let errorMessage = null;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+
+    let newlineIndex;
+    while ((newlineIndex = buffer.indexOf('\n')) !== -1) {
+      const line = buffer.slice(0, newlineIndex).trim();
+      buffer = buffer.slice(newlineIndex + 1);
+      if (!line) continue;
+
+      const msg = JSON.parse(line);
+      if (typeof msg.progress === 'number') setLoadingProgress(msg.progress);
+      if (msg.exam) exam = msg.exam;
+      if (msg.error) errorMessage = msg.error;
+    }
+  }
+
+  if (errorMessage) throw new Error(errorMessage);
+  return exam;
+}
+
 async function loadExam() {
   const season = el.season.value;
   const year = el.year.value;
-  el.status.textContent = 'טוען ומנתח את הבחינה…';
+  el.status.textContent = '';
   el.status.className = 'status';
   el['load-btn'].disabled = true;
+  setLoadingProgress(0);
+  el['loading-bar'].hidden = false;
 
   try {
     const res = await fetch(`/api/exam?season=${season}&year=${year}`);
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'טעינת הבחינה נכשלה');
-    if (!data.questions || !data.questions.length) throw new Error('לא נמצאו שאלות בבחינה זו.');
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || 'טעינת הבחינה נכשלה');
+    }
+
+    const data = await readExamStream(res);
+    if (!data || !data.questions || !data.questions.length) {
+      throw new Error('לא נמצאו שאלות בבחינה זו.');
+    }
 
     state.exam = data;
     state.parts = buildParts(data.questions);
     state.partIndex = 0;
     state.answers = new Array(data.questions.length).fill(null);
     state.lockedParts = new Array(state.parts.length).fill(false);
+    state.startedAt = Date.now();
 
     el.picker.hidden = true;
     el.control.hidden = false;
@@ -97,6 +176,7 @@ async function loadExam() {
     el.status.className = 'status error';
   } finally {
     el['load-btn'].disabled = false;
+    el['loading-bar'].hidden = true;
   }
 }
 
@@ -141,14 +221,19 @@ function openPart(index) {
 
   if (part.passage) {
     el['passage-box'].hidden = false;
-    el['passage-text'].textContent = part.passage;
+    el['passage-text'].innerHTML = '';
+    part.passage.forEach((paragraph) => {
+      const p = document.createElement('p');
+      appendPassageText(p, paragraph);
+      el['passage-text'].appendChild(p);
+    });
   } else {
     el['passage-box'].hidden = true;
-    el['passage-text'].textContent = '';
+    el['passage-text'].innerHTML = '';
   }
 
   el['finish-part-btn'].textContent =
-    index === state.parts.length - 1 ? 'סיים סימולציה' : 'סיים פרק ועבור לבא';
+    index === state.parts.length - 1 ? 'סיים סימולציה' : 'סיים פרק ועבור להבא';
 
   startTimer(part.seconds);
   renderPills();
@@ -323,6 +408,13 @@ function showResults() {
     el.review.appendChild(block);
   });
 
-  el['score-summary'].innerHTML =
-    `ציון: <b>${correctCount}</b> מתוך ${questions.length} שאלות, ב-${state.parts.length} פרקים`;
+  const totalMandatory = state.parts.reduce((sum, part) => sum + part.indices.length, 0);
+  const score = amirnetScore(correctCount, totalMandatory);
+  const minutes = Math.max(0, Math.round((Date.now() - state.startedAt) / 60000));
+
+  el['score-value'].textContent = score;
+  el['score-detail'].textContent = `${correctCount} תשובות נכונות מתוך ${totalMandatory}`;
+  el['stat-minutes'].textContent = minutes;
+  el['stat-questions'].textContent = totalMandatory;
+  el['stat-correct'].textContent = correctCount;
 }

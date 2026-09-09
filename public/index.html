@@ -29,6 +29,12 @@
         <button id="load-btn" class="btn btn-green">התחל סימולציה</button>
       </div>
       <p id="status" class="status"></p>
+      <div id="loading-bar" class="loading-bar" hidden>
+        <span class="loading-bar-label">טוען את הבחינה</span>
+        <div class="loading-bar-track">
+          <div id="loading-bar-fill" class="loading-bar-fill"></div>
+        </div>
+      </div>
     </section>
 
     <section id="control" class="panel" hidden>
@@ -63,7 +69,7 @@
           <button id="prev-btn" class="btn btn-gray">שאלה קודמת</button>
           <button id="next-btn" class="btn btn-green">שאלה הבאה</button>
         </div>
-        <button id="finish-part-btn" class="btn btn-orange">סיים פרק ועבור לבא</button>
+        <button id="finish-part-btn" class="btn btn-orange">סיים פרק ועבור להבא</button>
       </div>
     </section>
 
@@ -72,7 +78,7 @@
 
       <div id="passage-box" class="passage-box" hidden>
         <button id="passage-speak" class="speak speak-inset" type="button" aria-label="הקראת הקטע"></button>
-        <p id="passage-text" class="passage-text" dir="ltr" lang="en"></p>
+        <div id="passage-text" class="passage-text" dir="ltr" lang="en"></div>
       </div>
 
       <div class="q-stem">
@@ -84,8 +90,28 @@
     </section>
 
     <section id="results" class="panel results" hidden>
-      <h2>תוצאות הסימולציה</h2>
-      <p id="score-summary" class="score-summary"></p>
+      <div class="score-card">
+        <h2 class="score-card-title">תוצאות סימולציית אמירנט</h2>
+        <div class="score-box">
+          <div id="score-value" class="score-value">0</div>
+          <p class="score-caption">ציון אמירנט (50-150)</p>
+          <p id="score-detail" class="score-detail"></p>
+        </div>
+        <div class="score-stats">
+          <div class="score-stat">
+            <span id="stat-minutes" class="score-stat-value">0</span>
+            <span class="score-stat-label">דקות</span>
+          </div>
+          <div class="score-stat">
+            <span id="stat-questions" class="score-stat-value">0</span>
+            <span class="score-stat-label">שאלות</span>
+          </div>
+          <div class="score-stat">
+            <span id="stat-correct" class="score-stat-value">0</span>
+            <span class="score-stat-label">נכונות</span>
+          </div>
+        </div>
+      </div>
       <div id="review"></div>
       <button id="restart-btn" class="btn btn-green">תרגל בחינה נוספת</button>
     </section>
