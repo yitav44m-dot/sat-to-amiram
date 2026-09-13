@@ -82,12 +82,14 @@ test('real NITE exams', { skip: !pdfs.length || !havePdftotext() ? 'no local exa
           );
         }
         if (q.type === 'reading-comprehension') {
-          // Every NITE passage runs to at least two paragraphs, so one
-          // means the paragraph split collapsed - the failure mode when
-          // an exam indents its paragraph openings differently than the
-          // ones the heuristic was tuned against.
-          assert.ok(Array.isArray(q.passage) && q.passage.length > 1,
-            `${q.section}${q.number} passage did not split into paragraphs`);
+          // Every NITE passage runs to between two and five paragraphs.
+          // One means the paragraph split collapsed - the failure mode
+          // when an exam indents its paragraph openings differently than
+          // the ones the heuristic was tuned against; more than six means
+          // it shattered, with wrapped lines read as openers (summer 2024
+          // Text I once came out as ten).
+          assert.ok(Array.isArray(q.passage) && q.passage.length > 1 && q.passage.length <= 6,
+            `${q.section}${q.number} passage split into ${q.passage?.length} paragraphs`);
           assert.match(
             q.passage[0], /^\[\[1\]\] /,
             `${q.section}${q.number} passage missing its opening line-1 marker`

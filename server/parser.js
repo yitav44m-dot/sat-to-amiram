@@ -11,8 +11,12 @@ const PAGE_FOOTER_RE = /(Verbal Reasoning|Quantitative Reasoning|English).*Secti
 // turning that into a dash produces fluent-looking but wrong text. The
 // original letter isn't recoverable from the text alone, so it's dropped
 // rather than guessed.
+//
+// xpdf 4.06 (the build in the Docker image) maps that same dash to a
+// spaced ASCII hyphen instead, which is folded in so both versions yield
+// identical text.
 function cleanText(text) {
-  return text.replace(/(\s)�(\s)/g, '$1–$2').replace(/�/g, '');
+  return text.replace(/(\s)[-�](\s)/g, '$1–$2').replace(/�/g, '');
 }
 
 // pdftotext renders a sentence-completion blank as extra inline whitespace
@@ -202,6 +206,11 @@ function dominantIndent(leadings) {
 // what markBlanks() measures a blank-at-the-wrap against. Taken over every
 // question's stem at once: a single question can wrap only the once, and
 // that one wrap may be the blank itself.
+//
+// Some wrapped lines come out flush at column 0 instead - which of them
+// varies between xpdf versions, and under 4.06 they can outnumber the
+// indented ones. A flush line says nothing about where a wrap sits, so
+// it doesn't get a vote; only if every wrap is flush is there no baseline.
 function stemWrapIndent(block) {
   const leadings = [];
   const qRe = new RegExp(QUESTION_RE, 'g');
@@ -210,7 +219,8 @@ function stemWrapIndent(block) {
     const firstOptIdx = m[3].search(OPTION_ONE_RE);
     if (firstOptIdx === -1) continue;
     for (const line of m[3].slice(0, firstOptIdx).split('\n').slice(1)) {
-      if (line.trim()) leadings.push(line.length - line.trimStart().length);
+      const leading = line.length - line.trimStart().length;
+      if (line.trim() && leading > 0) leadings.push(leading);
     }
   }
   return dominantIndent(leadings) || null;
@@ -250,15 +260,22 @@ function indexStemsByNumber(block) {
 
 // pdftotext -layout puts a genuine new paragraph's opening line at a
 // different column from a wrapped continuation line - but not always the
-// same different column. Usually the paragraph opens at a single space,
-// narrower than the ~7 of a continuation line; in at least one real exam
-// (winter 2023, first section, Text I) it opens at 12 instead, wider. So
-// the signal is the departure from this passage's own dominant
-// continuation indent, in either direction, rather than any absolute
-// column. The one-character tolerance absorbs the drift pdftotext
-// introduces across a page break within a single paragraph, which is
-// never wider than that.
-const CONTINUATION_INDENT_DRIFT = 1;
+// same different column. Usually the paragraph opens at column 1,
+// narrower than a continuation line; in some exams (winter 2023, first
+// section, Text I) and in every passage under xpdf 4.06 it opens at 12
+// instead, wider. So the signal is the departure from this passage's own
+// dominant continuation indent, in either direction, rather than any
+// absolute column.
+//
+// The tolerance has to be generous, because continuation lines are not
+// all at one column either: pdftotext places them relative to the last
+// margin marker, so lines under a one-digit marker sit at 5 and lines
+// under a two-digit one at 7 (with 6 turning up too), and which of those
+// is the mode is a coin toss in a short passage. With a tolerance of 1,
+// summer 2024's Text I came out as ten one-line paragraphs. Across ten
+// real exams under both xpdf 4.00 and 4.06, continuation lines never
+// stray more than 2 from the mode and openers never come within 4 of it.
+const CONTINUATION_INDENT_DRIFT = 3;
 
 function continuationIndent(lines) {
   return dominantIndent(lines.filter((l) => !l.isMarker).map((l) => l.leading));

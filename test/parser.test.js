@@ -611,3 +611,91 @@ test('drops a mid-word replacement character instead of fabricating a dash insid
   );
   assert.doesNotMatch(q.passage[0], /\uFFFD/);
 });
+
+test('keeps a paragraph whole when its continuation lines sit at two different indents', () => {
+  // summer 2024, first section, Text I. pdftotext places a wrapped line
+  // relative to the last margin marker, so lines under "(1)" and "(5)"
+  // sit at column 5 and lines under "(10)" at 7. With a one-column
+  // tolerance around the mode, whichever indent lost the coin toss was
+  // read as a run of one-line paragraphs - ten of them in that passage.
+  const mixed =
+    'Text I (Questions 6-8)\n\n' +
+    '(1)  The first paragraph opens on the marker line and wraps onto lines that\n' +
+    '     sit at column five, because the marker above them is one digit wide,\n' +
+    '     and it keeps going like that for a few more lines until the next\n' +
+    '     marker comes along and changes nothing about the paragraph, which\n' +
+    '(5) is still the same paragraph, still one-digit markers, still column five\n' +
+    '     for the wrapped lines that follow it, up to the two-digit marker\n' +
+    '(10) from where the wrapped lines sit at column seven instead, for no\n' +
+    '       reason the reader would notice, since it is all one paragraph.\n' +
+    '       And it ends here.\n' +
+    '            A second paragraph opens wide, at column twelve, and wraps\n' +
+    '       back to column seven like the lines before it.\n\n' +
+    'Questions\n\n' +
+    '6. A question about the passage -\n\n' +
+    '(1) a\n(2) b\n(3) c\n(4) d\n\n' +
+    '7. Another question -\n\n' +
+    '(1) a\n(2) b\n(3) c\n(4) d\n\n' +
+    '8. A third question -\n\n' +
+    '(1) a\n(2) b\n(3) c\n(4) d\n\n';
+
+  const original = /Text I \(Questions 6-8\)[\s\S]*?\(4\) describe the dash\n/;
+  const q = parse(FIXTURE.replace(original, mixed)).questions.find((x) => x.section === 'First' && x.number === 6);
+
+  assert.strictEqual(q.passage.length, 2);
+  assert.match(q.passage[0], /^\[\[1\]\] The first paragraph .* \[\[5\]\] is still .* \[\[10\]\] from where .* And it ends here\.$/);
+  assert.match(q.passage[1], /^A second paragraph opens wide/);
+});
+
+test('a wrapped stem line flush at column 0 does not veto blank-at-wrap detection', () => {
+  // Under xpdf 4.06 (the Docker image) more wrapped stem lines come out
+  // flush left than indented - spring 2025, second section, has three
+  // flush against two at 7. Taking the mode over all of them made the
+  // baseline 0, which read as "no baseline", and the blank in question 5
+  // (a wrap at 14) fell to the end of the sentence.
+  const wrapBlank =
+    '1. The striking rock formations in the national park contrast\n\n' +
+    '              with the surrounding sand plains and desert.\n\n' +
+    '(1) narrowly\n(2) sharply\n(3) honestly\n(4) basically\n';
+  const flushWraps =
+    '2. The invented sample text is the        of the real exam layout, wrapped\n\n' +
+    'onto a second line flush at the margin, which says nothing about wraps,\n\n' +
+    'and onto a third line that is flush as well.\n\n' +
+    '(1) forecaster\n(2) mirror\n(3) inspector\n(4) publisher\n' +
+    '\n3. Test suites          before a release, not after one, and this stem\n\n' +
+    '       wraps at the ordinary indent, and then wraps once more onto a\n\n' +
+    '       third line, so that indent is the majority among indented wraps.\n\n' +
+    '(1) run\n(2) bury\n(3) delay\n(4) ignore\n';
+
+  const layoutText = FIXTURE.replace(/1\. A good fixture[\s\S]*?\(4\) recall\n/, `${wrapBlank}\n`)
+    .replace(/2\. The invented sample text[\s\S]*?\(4\) ignore\n/, flushWraps);
+
+  const q = parse(layoutText).questions.find((x) => x.section === 'First' && x.number === 1);
+  assert.strictEqual(
+    q.prompt,
+    'The striking rock formations in the national park contrast ________ with the surrounding sand plains and desert.'
+  );
+});
+
+test('folds a spaced ASCII hyphen into the same en dash as the replacement character', () => {
+  // xpdf 4.00 loses NITE's dash to U+FFFD; 4.06 renders it as " - ".
+  // Both builds are in use (local and Docker), and they should agree.
+  const passage =
+    'Text I (Questions 6-8)\n\n' +
+    '(1) The dash - whichever build rendered it - reads the same, while a\n' +
+    '       hyphenated word like well-known is left alone.\n\n' +
+    'Questions\n\n' +
+    '6. A question about the passage -\n\n' +
+    '(1) a\n(2) b\n(3) c\n(4) d\n\n' +
+    '7. Another question -\n\n' +
+    '(1) a\n(2) b\n(3) c\n(4) d\n\n' +
+    '8. A third question -\n\n' +
+    '(1) a\n(2) b\n(3) c\n(4) d\n\n';
+
+  const original = /Text I \(Questions 6-8\)[\s\S]*?\(4\) describe the dash\n/;
+  const q = parse(FIXTURE.replace(original, passage)).questions.find((x) => x.section === 'First' && x.number === 6);
+  assert.strictEqual(
+    q.passage[0],
+    '[[1]] The dash – whichever build rendered it – reads the same, while a hyphenated word like well-known is left alone.'
+  );
+});
