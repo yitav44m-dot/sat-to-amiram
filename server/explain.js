@@ -43,13 +43,13 @@ function buildPrompt(question) {
 async function askGemini(prompt) {
   const key = process.env.GEMINI_API_KEY;
   if (!key) throw new ExplainerUnavailableError();
-  const model = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+  const model = process.env.GEMINI_MODEL || 'gemini-3.6-flash';
   const res = await fetch(`${GEMINI_URL}/${model}:generateContent`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
     body: JSON.stringify({
       contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: { temperature: 0.3, thinkingConfig: { thinkingBudget: 0 } },
+      generationConfig: { temperature: 0.3, thinkingConfig: { thinkingLevel: 'minimal' } },
     }),
   });
   if (res.status === 429 || res.status === 503) throw new ExplainerBusyError();
