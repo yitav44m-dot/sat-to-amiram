@@ -339,6 +339,48 @@ function finishPart() {
   openPart(state.partIndex + 1);
 }
 
+// A wrong answer gets a button that fetches a short Hebrew explanation of
+// why the key is right and each other option is not. Loaded on demand so
+// only the questions someone actually wonders about cost an API call.
+function explainControl(question) {
+  const wrap = document.createElement('div');
+  wrap.className = 'review-explain';
+
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'btn btn-gray btn-small';
+  button.textContent = 'הסבר';
+  wrap.appendChild(button);
+
+  const text = document.createElement('p');
+  text.className = 'review-explain-text';
+  text.hidden = true;
+  wrap.appendChild(text);
+
+  button.addEventListener('click', async () => {
+    button.disabled = true;
+    button.textContent = 'טוען...';
+    const { season, year } = state.exam;
+    const params = new URLSearchParams({ season, year, section: question.section, number: question.number });
+    try {
+      const res = await fetch(`/api/explain?${params}`);
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error || 'ההסבר אינו זמין כרגע.');
+      text.textContent = body.explanation;
+      text.hidden = false;
+      button.hidden = true;
+    } catch (err) {
+      text.textContent = err.message;
+      text.classList.add('error');
+      text.hidden = false;
+      button.disabled = false;
+      button.textContent = 'נסה שוב';
+    }
+  });
+
+  return wrap;
+}
+
 function showResults() {
   clearInterval(state.ticker);
   window.speechSynthesis?.cancel();
@@ -401,6 +443,8 @@ function showResults() {
         line.textContent = label;
         item.appendChild(line);
       });
+
+      if (userAnswer !== null && !isCorrect) item.appendChild(explainControl(question));
 
       block.appendChild(item);
     });

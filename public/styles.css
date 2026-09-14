@@ -417,6 +417,22 @@ select, input[type="number"] {
 .review-option.is-correct { color: var(--green-deep); font-weight: 600; }
 .review-option.is-yours { color: var(--wrong); }
 
+.review-explain { margin-top: 10px; }
+.btn-small { padding: 7px 16px; font-size: 0.85rem; }
+
+.review-explain-text {
+  margin: 0;
+  padding: 12px 16px;
+  background: var(--green-soft);
+  border: 1px solid #d9f0e3;
+  border-radius: 8px;
+  font-size: 0.92rem;
+  line-height: 1.7;
+  white-space: pre-line;
+}
+
+.review-explain-text.error { background: #fdf0ee; border-color: #f3d4cf; color: var(--wrong); }
+
 #restart-btn { margin-top: 22px; }
 
 @media (max-width: 620px) {

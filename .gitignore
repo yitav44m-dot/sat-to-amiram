@@ -6,3 +6,4 @@ data/kidum/*.pdf
 !data/exams/.gitkeep
 !data/kidum/.gitkeep
 .env
+data/explanations/*.json

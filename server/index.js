@@ -7,6 +7,17 @@ const { URL } = require('url');
 const { getExamRawText, NoExamPdfError } = require('./fetchExam');
 const { parseEnglishExam, NoEnglishSectionError } = require('./parser');
 const { getKidumAnswerKey } = require('./kidum');
+const { explainQuestion, ExplainerUnavailableError, ExplainerBusyError } = require('./explain');
+
+// On Render the API key is an environment variable; locally it lives in a
+// gitignored .env so the same code runs unchanged in both places.
+const ENV_FILE = path.join(__dirname, '..', '.env');
+if (fs.existsSync(ENV_FILE)) {
+  for (const line of fs.readFileSync(ENV_FILE, 'utf8').split('\n')) {
+    const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*?)\s*$/);
+    if (m && !(m[1] in process.env)) process.env[m[1]] = m[2];
+  }
+}
 
 const PORT = process.env.PORT || 3000;
 const PUBLIC_DIR = path.join(__dirname, '..', 'public');
@@ -107,11 +118,53 @@ async function handleExamRequest(query, res) {
   }
 }
 
+// Only a question from an exam this server has already parsed and cached
+// can be explained - which is every question the review page can show,
+// since the exam had to come through /api/exam to be taken at all.
+async function handleExplainRequest(query, res) {
+  const season = (query.get('season') || '').toLowerCase();
+  const year = Number(query.get('year'));
+  const section = query.get('section');
+  const number = Number(query.get('number'));
+  const cachePath = path.join(EXAMS_DIR, `${season}_${year}.json`);
+
+  const reply = (status, body) => {
+    res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' });
+    res.end(JSON.stringify(body));
+  };
+
+  if (!/^[a-z]+$/.test(season) || !Number.isInteger(year) || !fs.existsSync(cachePath)) {
+    reply(404, { error: 'Unknown exam.' });
+    return;
+  }
+  const exam = JSON.parse(fs.readFileSync(cachePath, 'utf8'));
+  const question = exam.questions.find((q) => q.section === section && q.number === number);
+  if (!question || question.correctIndex === null) {
+    reply(404, { error: 'Unknown question.' });
+    return;
+  }
+
+  try {
+    reply(200, { explanation: await explainQuestion(question, { season, year }) });
+  } catch (err) {
+    if (err instanceof ExplainerUnavailableError || err instanceof ExplainerBusyError) {
+      reply(503, { error: err.message });
+      return;
+    }
+    console.error(`[explain ${season} ${year} ${section}${number}]`, err.message);
+    reply(500, { error: 'ההסבר אינו זמין כרגע.' });
+  }
+}
+
 const server = http.createServer((req, res) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
 
   if (url.pathname === '/api/exam') {
     handleExamRequest(url.searchParams, res);
+    return;
+  }
+  if (url.pathname === '/api/explain') {
+    handleExplainRequest(url.searchParams, res);
     return;
   }
 
