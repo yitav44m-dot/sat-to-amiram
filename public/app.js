@@ -387,6 +387,7 @@ function showResults() {
 
   const questions = state.exam.questions;
   let correctCount = 0;
+  let gradableCount = 0;
 
   el.control.hidden = true;
   el['question-card'].hidden = true;
@@ -397,12 +398,17 @@ function showResults() {
     const block = document.createElement('section');
     block.className = 'review-part';
 
-    const partCorrect = part.indices.filter((i) => state.answers[i] === questions[i].correctIndex).length;
+    // A question with no answer key (see applyKidumFallback on the server)
+    // can't be graded either way, so it is neither counted as wrong nor
+    // included in the total the score is taken over.
+    const gradable = part.indices.filter((i) => questions[i].correctIndex !== null);
+    const partCorrect = gradable.filter((i) => state.answers[i] === questions[i].correctIndex).length;
     correctCount += partCorrect;
+    gradableCount += gradable.length;
 
     const heading = document.createElement('h3');
     heading.textContent =
-      `פרק ${partIndex + 1} — ${part.titleHe} ${part.ordinal} (${partCorrect}/${part.indices.length})`;
+      `פרק ${partIndex + 1} — ${part.titleHe} ${part.ordinal} (${partCorrect}/${gradable.length})`;
     block.appendChild(heading);
 
     part.indices.forEach((questionIndex, i) => {
@@ -414,7 +420,10 @@ function showResults() {
       item.className = 'review-item';
 
       const tag = document.createElement('span');
-      if (userAnswer === null) {
+      if (question.correctIndex === null) {
+        tag.className = 'tag blank';
+        tag.textContent = 'אין מפתח תשובות';
+      } else if (userAnswer === null) {
         tag.className = 'tag blank';
         tag.textContent = 'לא נענה';
       } else {
@@ -444,7 +453,7 @@ function showResults() {
         item.appendChild(line);
       });
 
-      if (userAnswer !== null && !isCorrect) item.appendChild(explainControl(question));
+      if (userAnswer !== null && question.correctIndex !== null && !isCorrect) item.appendChild(explainControl(question));
 
       block.appendChild(item);
     });
@@ -452,7 +461,7 @@ function showResults() {
     el.review.appendChild(block);
   });
 
-  const totalMandatory = state.parts.reduce((sum, part) => sum + part.indices.length, 0);
+  const totalMandatory = gradableCount;
   const score = amirnetScore(correctCount, totalMandatory);
   const minutes = Math.max(0, Math.round((Date.now() - state.startedAt) / 60000));
 

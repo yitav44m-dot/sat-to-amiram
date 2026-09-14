@@ -71,25 +71,38 @@ async function pdfToText(pdfPath) {
 // assembled by question number; it counts only if it covers 1..N with no
 // gaps and no conflicts (a summary page carrying several subjects' tables
 // conflicts on question 1 and is dropped).
+//
+// Which question a fragment starts at comes from its first label when the
+// label row reads as a descending run. In some exports (autumn 2021) the
+// label font is unreadable and the row comes out as noise like
+// "25 24 23 20 22 22 9 8 7 6 5 4 3 0 2"; the digit row beneath is still
+// fine, so such a fragment is placed positionally instead, as the row
+// after everything read so far (the layout is 15 questions, then the
+// remaining 7). Only the label row's token count is trusted there.
 function parseSectionTable(pageText) {
   const numbers = (line) =>
     line.split(/\s+/).filter((t) => t !== '-').map((t) => (/^\d{1,2}$/.test(t) ? Number(t) : NaN));
-  const isLabelRow = (n) => n.length >= 2 && n.every((x) => x >= 1) && n.every((x, i) => i === 0 || x <= n[i - 1]);
   const isDigitRow = (n) => n.length >= 1 && n.every((x) => x >= 1 && x <= 4);
+  const isLabelRow = (n) => n.length >= 2 && n.every((x) => Number.isInteger(x));
+  const labelsReadable = (n) =>
+    n.every((x) => x >= 1) &&
+    n.every((x, i) => i === 0 || x <= n[i - 1]) &&
+    n[0] - n[n.length - 1] === n.length - 1;
 
   const lines = pageText.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
   const key = new Map();
+  let placed = 0;
   for (let i = 0; i + 1 < lines.length; i++) {
     const labels = numbers(lines[i]);
     const digits = numbers(lines[i + 1]);
     if (!isLabelRow(labels) || !isDigitRow(digits) || labels.length !== digits.length) continue;
-    const top = labels[0];
-    if (top < digits.length) continue;
+    const top = labelsReadable(labels) ? labels[0] : placed + digits.length;
     digits.forEach((d, k) => {
       const question = top - k;
       if (key.has(question) && key.get(question) !== d) key.set(question, NaN);
       else if (!key.has(question)) key.set(question, d);
     });
+    placed = Math.max(placed, top);
     i++;
   }
   if (!key.size) return null;

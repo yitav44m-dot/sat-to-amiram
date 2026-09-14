@@ -77,6 +77,22 @@ test('parseSectionTable drops a summary page that lists several subjects at once
   assert.strictEqual(parseSectionTable(page), null);
 });
 
+test('parseSectionTable places rows positionally when the label font is unreadable', () => {
+  // kidum's autumn 2021 solutions: the label rows come out as noise
+  // ("25 24 23 20 22 22 9 8 7 6 5 4 3 0 2" for 15..1, "00 02 02 29 28 27 26"
+  // for 22..16) under both xpdf builds, while the digit rows are intact.
+  const page =
+    '- 35-    -\n' +
+    '25 24 23 20 22 22 9 8 7 6 5 4 3 0 2\n' +
+    '1 4 4 3 2 2 1 4 1 3 2 1 2 4 3\n' +
+    '                                             00 02 02 29 28 27 26\n' +
+    '                                              2 2 4 3 2 2 4\n';
+  assert.deepStrictEqual(
+    parseSectionTable(page),
+    [3, 4, 2, 1, 2, 3, 1, 4, 1, 2, 2, 3, 4, 4, 1, 4, 2, 2, 3, 4, 2, 2]
+  );
+});
+
 function buildDoc({ withGloss = true } = {}) {
   const en15 = [15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1];
   const en7 = [22, 21, 20, 19, 18, 17, 16];
