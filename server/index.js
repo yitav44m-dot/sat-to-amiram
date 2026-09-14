@@ -22,6 +22,7 @@ if (fs.existsSync(ENV_FILE)) {
 const PORT = process.env.PORT || 3000;
 const PUBLIC_DIR = path.join(__dirname, '..', 'public');
 const EXAMS_DIR = path.join(__dirname, '..', 'data', 'exams');
+const SEASONS = ['winter', 'spring', 'summer', 'autumn'];
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -79,9 +80,8 @@ function userMessage(err) {
 async function handleExamRequest(query, res) {
   const season = (query.get('season') || '').toLowerCase();
   const year = Number(query.get('year'));
-  const validSeasons = ['winter', 'spring', 'summer', 'autumn'];
 
-  if (!validSeasons.includes(season) || !Number.isInteger(year) || year < 2015 || year > 2100) {
+  if (!SEASONS.includes(season) || !Number.isInteger(year) || year < 2015 || year > 2100) {
     res.writeHead(400, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'Provide a valid season (winter/spring/summer/autumn) and year.' }));
     return;
@@ -94,57 +94,57 @@ async function handleExamRequest(query, res) {
   res.writeHead(200, { 'Content-Type': 'application/x-ndjson; charset=utf-8' });
   const sendProgress = (progress) => res.write(JSON.stringify({ progress }) + '\n');
 
-  const cachePath = path.join(EXAMS_DIR, `${season}_${year}.json`);
   try {
-    if (fs.existsSync(cachePath)) {
-      const exam = JSON.parse(fs.readFileSync(cachePath, 'utf8'));
-      res.end(JSON.stringify({ progress: 100, exam }) + '\n');
-      return;
-    }
-
-    sendProgress(2);
-    const { layoutText, tableText } = await getExamRawText(season, year, sendProgress);
-    sendProgress(92);
-    let exam = parseEnglishExam(layoutText, { season, year }, tableText);
-    exam = await applyKidumFallback(exam, season, year);
-    sendProgress(97);
-
-    fs.mkdirSync(EXAMS_DIR, { recursive: true });
-    fs.writeFileSync(cachePath, JSON.stringify(exam));
-
+    const exam = await loadExam(season, year, sendProgress);
     res.end(JSON.stringify({ progress: 100, exam }) + '\n');
   } catch (err) {
     res.end(JSON.stringify({ error: userMessage(err) }) + '\n');
   }
 }
 
-// Only a question from an exam this server has already parsed and cached
-// can be explained - which is every question the review page can show,
-// since the exam had to come through /api/exam to be taken at all.
+async function loadExam(season, year, sendProgress = () => {}) {
+  const cachePath = path.join(EXAMS_DIR, `${season}_${year}.json`);
+  if (fs.existsSync(cachePath)) return JSON.parse(fs.readFileSync(cachePath, 'utf8'));
+
+  sendProgress(2);
+  const { layoutText, tableText } = await getExamRawText(season, year, sendProgress);
+  sendProgress(92);
+  let exam = parseEnglishExam(layoutText, { season, year }, tableText);
+  exam = await applyKidumFallback(exam, season, year);
+  sendProgress(97);
+
+  fs.mkdirSync(EXAMS_DIR, { recursive: true });
+  fs.writeFileSync(cachePath, JSON.stringify(exam));
+  return exam;
+}
+
+// The exam is loaded the same way /api/exam loads it, not read from the
+// cache alone: on Render the disk is wiped by every deploy and idle spin-
+// down, so an exam taken before one of those is gone by the time its
+// results page asks for an explanation.
 async function handleExplainRequest(query, res) {
   const season = (query.get('season') || '').toLowerCase();
   const year = Number(query.get('year'));
   const section = query.get('section');
   const number = Number(query.get('number'));
-  const cachePath = path.join(EXAMS_DIR, `${season}_${year}.json`);
 
   const reply = (status, body) => {
     res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' });
     res.end(JSON.stringify(body));
   };
 
-  if (!/^[a-z]+$/.test(season) || !Number.isInteger(year) || !fs.existsSync(cachePath)) {
-    reply(404, { error: 'Unknown exam.' });
-    return;
-  }
-  const exam = JSON.parse(fs.readFileSync(cachePath, 'utf8'));
-  const question = exam.questions.find((q) => q.section === section && q.number === number);
-  if (!question || question.correctIndex === null) {
-    reply(404, { error: 'Unknown question.' });
+  if (!SEASONS.includes(season) || !Number.isInteger(year)) {
+    reply(400, { error: 'Unknown exam.' });
     return;
   }
 
   try {
+    const exam = await loadExam(season, year);
+    const question = exam.questions.find((q) => q.section === section && q.number === number);
+    if (!question || question.correctIndex === null) {
+      reply(404, { error: 'Unknown question.' });
+      return;
+    }
     reply(200, { explanation: await explainQuestion(question, { season, year }) });
   } catch (err) {
     if (err instanceof ExplainerUnavailableError || err instanceof ExplainerBusyError) {

@@ -49,6 +49,34 @@ test('parseSectionTable rejects a table whose answer digits are out of range', (
   assert.strictEqual(parseSectionTable(page), null);
 });
 
+test('parseSectionTable reassembles a table whose rows xpdf 4.06 split into fragments', () => {
+  // kidum's summer 2020 solutions, page 40, as the Docker image's pdftotext
+  // renders it: the 15-question row comes out in two pieces, with page
+  // furniture leaking in as dashes on the first label fragment. The older
+  // whole-row parser saw no table here at all, and the fallback then paired
+  // the wrong two tables - shifting every answer by one section.
+  const page =
+    '                     -40-    -\n' +
+    '15 14  13 12  11 10    -  -\n' +
+    '2 3    4 1    1 1\n' +
+    '                     9 8 7 6 5 4 3 2 1\n' +
+    '                     4 3 3 1 1 3 2 2 2\n' +
+    '                            22 21 20 19 18 17 16\n' +
+    '                            4 4 4 4 1 4 2\n' +
+    '        .      ____       .1\n';
+  assert.deepStrictEqual(
+    parseSectionTable(page),
+    [2, 2, 2, 3, 1, 1, 3, 3, 4, 1, 1, 1, 4, 3, 2, 2, 4, 1, 4, 4, 4, 4]
+  );
+});
+
+test('parseSectionTable drops a summary page that lists several subjects at once', () => {
+  // Question 1 appears once per subject with different answers; that is
+  // not one table, and must not be mistaken for an English section.
+  const page = table([3, 2, 1], [1, 2, 3]) + table([3, 2, 1], [4, 4, 4]);
+  assert.strictEqual(parseSectionTable(page), null);
+});
+
 function buildDoc({ withGloss = true } = {}) {
   const en15 = [15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1];
   const en7 = [22, 21, 20, 19, 18, 17, 16];
