@@ -17,7 +17,8 @@ function configured() {
 }
 
 async function request(method, table, query, body) {
-  const url = `${process.env.SUPABASE_URL}/rest/v1/${table}${query ? `?${query}` : ''}`;
+  const base = process.env.SUPABASE_URL.replace(/\/+$/, '');
+  const url = `${base}/rest/v1/${table}${query ? `?${query}` : ''}`;
   const key = process.env.SUPABASE_SERVICE_KEY;
   const res = await fetch(url, {
     method,
