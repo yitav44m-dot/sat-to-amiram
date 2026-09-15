@@ -8,6 +8,7 @@ const { getExamRawText, NoExamPdfError } = require('./fetchExam');
 const { parseEnglishExam, NoEnglishSectionError } = require('./parser');
 const { getKidumAnswerKey } = require('./kidum');
 const { explainQuestion, ExplainerUnavailableError, ExplainerBusyError } = require('./explain');
+const store = require('./store');
 
 // On Render the API key is an environment variable; locally it lives in a
 // gitignored .env so the same code runs unchanged in both places.
@@ -102,19 +103,33 @@ async function handleExamRequest(query, res) {
   }
 }
 
+// Three layers, cheapest first: this instance's disk, then the database
+// (which outlives the disk - see server/store.js), then NITE itself.
 async function loadExam(season, year, sendProgress = () => {}) {
-  const cachePath = path.join(EXAMS_DIR, `${season}_${year}.json`);
+  const id = `${season}_${year}`;
+  const cachePath = path.join(EXAMS_DIR, `${id}.json`);
   if (fs.existsSync(cachePath)) return JSON.parse(fs.readFileSync(cachePath, 'utf8'));
 
+  const cacheOnDisk = (exam) => {
+    fs.mkdirSync(EXAMS_DIR, { recursive: true });
+    fs.writeFileSync(cachePath, JSON.stringify(exam));
+  };
+
   sendProgress(2);
+  const stored = await store.getExam(id);
+  if (stored) {
+    cacheOnDisk(stored);
+    return stored;
+  }
+
   const { layoutText, tableText } = await getExamRawText(season, year, sendProgress);
   sendProgress(92);
   let exam = parseEnglishExam(layoutText, { season, year }, tableText);
   exam = await applyKidumFallback(exam, season, year);
   sendProgress(97);
 
-  fs.mkdirSync(EXAMS_DIR, { recursive: true });
-  fs.writeFileSync(cachePath, JSON.stringify(exam));
+  cacheOnDisk(exam);
+  await store.putExam(id, exam);
   return exam;
 }
 

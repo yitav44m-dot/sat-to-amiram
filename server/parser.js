@@ -451,7 +451,13 @@ function parseEnglishExam(rawText, { season, year }, tableText) {
   };
 }
 
+// Stamped on every parsed exam the store keeps. Bump it when a change
+// here or in server/kidum.js alters what an exam parses to, so exams
+// stored under the old behaviour are re-parsed rather than served as-is.
+const PARSER_VERSION = 1;
+
 module.exports = {
+  PARSER_VERSION,
   parseEnglishExam,
   stripNoise,
   splitEnglishSections,

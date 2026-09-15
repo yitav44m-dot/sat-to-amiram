@@ -2,6 +2,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const store = require('./store');
 
 const CACHE_DIR = path.join(__dirname, '..', 'data', 'explanations');
 const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
@@ -69,10 +70,18 @@ function readCache(season, year) {
   return fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : {};
 }
 
+function writeCache(season, year, id, text) {
+  const cache = readCache(season, year);
+  cache[id] = text;
+  fs.mkdirSync(CACHE_DIR, { recursive: true });
+  fs.writeFileSync(cachePath(season, year), JSON.stringify(cache, null, 2));
+}
+
 // Two visitors pressing the button on the same uncached question within
 // a few seconds would otherwise cost two API calls for one answer.
 const inFlight = new Map();
 
+// Same three layers as loadExam(): disk, then the database, then Gemini.
 async function explainQuestion(question, { season, year }) {
   const id = `${question.section}-${question.number}`;
   const cached = readCache(season, year)[id];
@@ -81,13 +90,17 @@ async function explainQuestion(question, { season, year }) {
   const flightKey = `${season}_${year}_${id}`;
   if (inFlight.has(flightKey)) return inFlight.get(flightKey);
 
-  const pending = askGemini(buildPrompt(question)).then((text) => {
-    const cache = readCache(season, year);
-    cache[id] = text;
-    fs.mkdirSync(CACHE_DIR, { recursive: true });
-    fs.writeFileSync(cachePath(season, year), JSON.stringify(cache, null, 2));
+  const pending = (async () => {
+    const stored = await store.getExplanation(`${season}_${year}`, id);
+    if (stored) {
+      writeCache(season, year, id, stored);
+      return stored;
+    }
+    const text = await askGemini(buildPrompt(question));
+    writeCache(season, year, id, text);
+    await store.putExplanation(`${season}_${year}`, id, text);
     return text;
-  }).finally(() => inFlight.delete(flightKey));
+  })().finally(() => inFlight.delete(flightKey));
   inFlight.set(flightKey, pending);
   return pending;
 }
