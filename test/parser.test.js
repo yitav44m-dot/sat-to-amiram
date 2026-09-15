@@ -146,20 +146,33 @@ test('renders a sentence-completion blank as a visible marker, not a swallowed s
   assert.strictEqual(q.prompt, 'A good fixture helps a parser ________ hidden regressions.');
 });
 
-test('a wrapped line\u2019s leading indentation is not read as the blank\u2019s position', () => {
+test('a wrapped stem with no trace of its blank has the blank at the wrap', () => {
+  // winter 2022, first section, question 3: the blank is the last thing
+  // on the first line, so the trailing spaces that would have marked it
+  // are trimmed away, and both extractions read as an ordinary wrap. It
+  // used to land at the very end ("...to his fellow Athenians ________.").
   const wrapped =
-    '1. This sentence intentionally wraps right at a normal\n\n' +
-    '       margin, and its missing word was lost without a trace.\n\n' +
-    '(1) a\n(2) b\n(3) c\n(4) d\n';
-  const exam = parse(FIXTURE.replace(/1\. A good fixture[\s\S]*?\(4\) recall\n/, `${wrapped}\n`));
-  const q = exam.questions.find((x) => x.section === 'First' && x.number === 1);
-  // No blank is recoverable here, so the fallback still shows one (every real
-  // sentence-completion question has exactly one blank) \u2014 but at the end of
-  // the sentence, not conjured mid-sentence from the wrap's indentation.
+    '3. Greek philosopher Antisthenes was known for his biting humor and tendency to\n\n' +
+    '       his fellow Athenians.\n\n' +
+    '(1) sift\n(2) mock\n(3) clutch\n(4) thaw\n';
+  const exam = parse(FIXTURE.replace(/3\. Test suites[\s\S]*?\(4\) ignore\n/, `${wrapped}\n`));
+  const q = exam.questions.find((x) => x.section === 'First' && x.number === 3);
   assert.strictEqual(
     q.prompt,
-    'This sentence intentionally wraps right at a normal margin, and its missing word was lost without a trace ________.'
+    'Greek philosopher Antisthenes was known for his biting humor and tendency to ________ his fellow Athenians.'
   );
+});
+
+test('a lone space before mid-sentence punctuation is the blank, not a stray', () => {
+  // winter 2023, first section, question 8: "After a long , Canadian
+  // singer" - the blank sits right before the comma, so its run of spaces
+  // collapses to one. It used to land at the very end of the sentence.
+  const swallowed =
+    '1. After a long , Canadian singer Leonard Cohen staged a comeback in 2008.\n\n' +
+    '(1) latitude\n(2) hiatus\n(3) stimulus\n(4) census\n';
+  const exam = parse(FIXTURE.replace(/1\. A good fixture[\s\S]*?\(4\) recall\n/, `${swallowed}\n`));
+  const q = exam.questions.find((x) => x.section === 'First' && x.number === 1);
+  assert.strictEqual(q.prompt, 'After a long ________, Canadian singer Leonard Cohen staged a comeback in 2008.');
 });
 
 test('recovers a blank swallowed right before the closing period', () => {

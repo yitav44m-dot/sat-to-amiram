@@ -53,13 +53,35 @@ function normalizeNativeBlanks(text) {
   return text.replace(/_{3,}/g, '________');
 }
 
-// If no mid-line blank was found, the blank was likely the sentence's last
-// word: pdftotext trims trailing whitespace at the end of a line, so a blank
-// immediately before the closing period loses its extra spaces down to one,
-// instead of the 2+ markBlanks() looks for. When even that's gone (the blank
-// left no trace at all), still show one at the end rather than none — a
-// sentence-completion question with no visible blank reads as already
-// finished.
+// A blank with punctuation right after it leaves only a single space in
+// front of that punctuation: pdftotext squeezes the run down to one
+// rather than the 2+ markBlanks() looks for. English never puts a space
+// there, so in a sentence-completion stem it can only be the blank
+// ("After a long , Canadian singer", "readers .").
+function markBlankBeforePunctuation(stem) {
+  return stem.replace(/(\S) (?=[.,;:!?])/g, '$1 ________');
+}
+
+// A blank anywhere within a line leaves some trace - the spaces above,
+// or extra indent when it opens a wrapped line. The one place it can
+// vanish entirely is the end of a line, because pdftotext trims trailing
+// whitespace. So a stem that wraps and shows no trace at all has its blank
+// at the wrap. With more than one wrap, the line the blank shortened is
+// the one that ends earliest.
+function blankAtWrap(rawStem) {
+  const lines = rawStem.split('\n').map((l) => l.trim()).filter(Boolean);
+  if (lines.length < 2) return null;
+  let shortest = 0;
+  for (let i = 1; i < lines.length - 1; i++) {
+    if (lines[i].length < lines[shortest].length) shortest = i;
+  }
+  lines[shortest] += ' ________';
+  return lines.join(' ');
+}
+
+// When the blank left no trace at all, still show one at the end rather
+// than none: a sentence-completion question with no visible blank reads
+// as already finished.
 function appendBlank(stem) {
   const endsWithPeriod = stem.endsWith('.');
   const body = (endsWithPeriod ? stem.slice(0, -1) : stem).trim();
@@ -237,12 +259,16 @@ function parseSimpleQuestions(block, { forceBlank = false, tableBlock = null, de
     const body = m[3];
     const firstOptIdx = body.search(OPTION_ONE_RE);
     if (firstOptIdx === -1) continue;
-    let stem = normalizeNativeBlanks(
-      cleanText(markBlanks(body.slice(0, firstOptIdx), { wrapIndent }).replace(/\s+/g, ' ').trim())
-    );
+    const rawStem = body.slice(0, firstOptIdx);
+    const finish = (text) => normalizeNativeBlanks(cleanText(text.replace(/\s+/g, ' ').trim()));
+    let stem = finish(markBlanks(rawStem, { wrapIndent }));
+    if (forceBlank && stem && !stem.includes('________')) {
+      stem = markBlankBeforePunctuation(stem);
+    }
     if (forceBlank && stem && !stem.includes('________')) {
       const recovered = tableStems && recoverBlankFromTable(stem, tableStems.get(number));
-      stem = recovered || ensureBlank(stem);
+      const atWrap = blankAtWrap(rawStem);
+      stem = recovered || (atWrap ? finish(atWrap) : ensureBlank(stem));
     }
     const options = parseOptions(body.slice(firstOptIdx));
     if (stem && options.length === 4) {
@@ -454,7 +480,7 @@ function parseEnglishExam(rawText, { season, year }, tableText) {
 // Stamped on every parsed exam the store keeps. Bump it when a change
 // here or in server/kidum.js alters what an exam parses to, so exams
 // stored under the old behaviour are re-parsed rather than served as-is.
-const PARSER_VERSION = 1;
+const PARSER_VERSION = 2;
 
 module.exports = {
   PARSER_VERSION,
