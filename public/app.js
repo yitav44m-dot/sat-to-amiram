@@ -74,6 +74,18 @@ const el = {};
   el[id] = document.getElementById(id);
 });
 
+// The picker opens on whichever sitting was practiced last on this device.
+const LAST_EXAM_KEY = 'lastExam';
+try {
+  const last = JSON.parse(localStorage.getItem(LAST_EXAM_KEY));
+  if (last && SEASONS_HE[last.season] && last.year) {
+    el.season.value = last.season;
+    el.year.value = last.year;
+  }
+} catch {
+  // storage unavailable - keep the page's own default
+}
+
 el['load-btn'].addEventListener('click', loadExam);
 el['prev-btn'].addEventListener('click', () => goToQuestion(state.questionIndex - 1));
 el['next-btn'].addEventListener('click', () => goToQuestion(state.questionIndex + 1));
@@ -157,6 +169,11 @@ async function loadExam() {
     }
 
     state.exam = data;
+    try {
+      localStorage.setItem(LAST_EXAM_KEY, JSON.stringify({ season, year }));
+    } catch {
+      // storage unavailable - nothing to remember with
+    }
     state.parts = buildParts(data.questions);
     state.partIndex = 0;
     state.answers = new Array(data.questions.length).fill(null);
