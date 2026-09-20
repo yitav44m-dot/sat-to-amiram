@@ -74,13 +74,12 @@ const el = {};
   el[id] = document.getElementById(id);
 });
 
-// The earliest sitting NITE has published; the list runs newest first
-// and grows by itself each year.
+// The earliest sitting NITE has published; the list runs newest first,
+// so the current year is the default, and it grows by itself each year.
 const FIRST_EXAM_YEAR = 2019;
 for (let y = new Date().getFullYear(); y >= FIRST_EXAM_YEAR; y--) {
   el.year.append(new Option(y, y));
 }
-el.year.value = 2024;
 
 // The picker opens on whichever sitting was practiced last on this device.
 const LAST_EXAM_KEY = 'lastExam';
