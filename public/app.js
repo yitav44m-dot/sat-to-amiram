@@ -74,9 +74,9 @@ const el = {};
   el[id] = document.getElementById(id);
 });
 
-// NITE has published exam forms since 2015; the list runs newest first
+// The earliest sitting NITE has published; the list runs newest first
 // and grows by itself each year.
-const FIRST_EXAM_YEAR = 2015;
+const FIRST_EXAM_YEAR = 2019;
 for (let y = new Date().getFullYear(); y >= FIRST_EXAM_YEAR; y--) {
   el.year.append(new Option(y, y));
 }
