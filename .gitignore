@@ -1,5 +1,7 @@
 node_modules/
-data/pdfs/*.pdf
+# The exam PDFs are kept here because NITE has since replaced the files it
+# publishes with editions that have no English section at all - these are
+# the only copies left of the forms the parser was built against.
 data/exams/*.json
 data/kidum/*.pdf
 !data/pdfs/.gitkeep
