@@ -78,6 +78,20 @@ function userMessage(err) {
   return err.message;
 }
 
+// The sittings the picker offers. Everything the app can serve is in the
+// database (and, on an instance that has served it since, on disk): NITE
+// now publishes every form without its English section, so a sitting that
+// isn't stored can no longer be fetched from anywhere.
+async function handleExamListRequest(res) {
+  const onDisk = fs.existsSync(EXAMS_DIR)
+    ? fs.readdirSync(EXAMS_DIR).filter((f) => f.endsWith('.json')).map((f) => f.replace(/.json$/, ''))
+    : [];
+  const stored = await store.listExams();
+  const exams = [...new Set([...onDisk, ...(stored || [])])].sort();
+  res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+  res.end(JSON.stringify({ exams }));
+}
+
 async function handleExamRequest(query, res) {
   const season = (query.get('season') || '').toLowerCase();
   const year = Number(query.get('year'));
@@ -174,6 +188,10 @@ async function handleExplainRequest(query, res) {
 const server = http.createServer((req, res) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
 
+  if (url.pathname === '/api/exams') {
+    handleExamListRequest(res);
+    return;
+  }
   if (url.pathname === '/api/exam') {
     handleExamRequest(url.searchParams, res);
     return;

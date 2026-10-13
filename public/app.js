@@ -74,24 +74,68 @@ const el = {};
   el[id] = document.getElementById(id);
 });
 
-// The earliest sitting NITE has published; the list runs newest first,
-// so the current year is the default, and it grows by itself each year.
-const FIRST_EXAM_YEAR = 2019;
-for (let y = new Date().getFullYear(); y >= FIRST_EXAM_YEAR; y--) {
-  el.year.append(new Option(y, y));
+const SEASON_ORDER = ['winter', 'spring', 'summer', 'autumn'];
+const LAST_EXAM_KEY = 'lastExam';
+
+// Only sittings the server can actually serve are offered - see
+// handleExamListRequest() in server/index.js. A sitting that was never
+// published, or whose form carries no English section, simply isn't there.
+const seasonsByYear = new Map();
+
+function fillSeasons(year) {
+  const seasons = seasonsByYear.get(Number(year)) || [];
+  el.season.replaceChildren(...seasons.map((s) => new Option(SEASONS_HE[s], s)));
 }
 
-// The picker opens on whichever sitting was practiced last on this device.
-const LAST_EXAM_KEY = 'lastExam';
-try {
-  const last = JSON.parse(localStorage.getItem(LAST_EXAM_KEY));
-  if (last && SEASONS_HE[last.season] && last.year) {
-    el.season.value = last.season;
-    el.year.value = last.year;
+function rememberedExam() {
+  try {
+    return JSON.parse(localStorage.getItem(LAST_EXAM_KEY));
+  } catch {
+    return null;
   }
-} catch {
-  // storage unavailable - keep the page's own default
 }
+
+async function fillPicker() {
+  let ids = [];
+  try {
+    const res = await fetch('/api/exams');
+    ids = (await res.json()).exams || [];
+  } catch {
+    // fall through to the empty-list message below
+  }
+
+  for (const id of ids) {
+    const [season, year] = id.split('_');
+    if (!SEASONS_HE[season]) continue;
+    const list = seasonsByYear.get(Number(year)) || [];
+    list.push(season);
+    seasonsByYear.set(Number(year), list);
+  }
+  for (const list of seasonsByYear.values()) {
+    list.sort((a, b) => SEASON_ORDER.indexOf(a) - SEASON_ORDER.indexOf(b));
+  }
+
+  if (!seasonsByYear.size) {
+    el.status.textContent = 'אין בחינות זמינות כרגע. נסה שוב בעוד רגע.';
+    el.status.className = 'status error';
+    el['load-btn'].disabled = true;
+    return;
+  }
+
+  const years = [...seasonsByYear.keys()].sort((a, b) => b - a);
+  el.year.replaceChildren(...years.map((y) => new Option(y, y)));
+
+  // The picker opens on whichever sitting was practiced last on this
+  // device, as long as it is still offered; otherwise on the newest.
+  const last = rememberedExam();
+  const offered = last && seasonsByYear.get(Number(last.year))?.includes(last.season);
+  el.year.value = offered ? last.year : years[0];
+  fillSeasons(el.year.value);
+  if (offered) el.season.value = last.season;
+}
+
+el.year.addEventListener('change', () => fillSeasons(el.year.value));
+fillPicker();
 
 el['load-btn'].addEventListener('click', loadExam);
 el['prev-btn'].addEventListener('click', () => goToQuestion(state.questionIndex - 1));

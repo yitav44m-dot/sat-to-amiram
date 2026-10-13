@@ -55,6 +55,16 @@ async function getExam(id) {
   });
 }
 
+// Which sittings the picker may offer. NITE has since replaced the forms
+// it publishes with editions that carry no English section, so what is
+// stored here is the whole of what the app can still serve.
+async function listExams() {
+  return attempt('list exams', async () => {
+    const rows = await request('GET', 'exams', `parser_version=eq.${PARSER_VERSION}&select=id`);
+    return rows.map((r) => r.id);
+  });
+}
+
 async function putExam(id, exam) {
   await attempt(`put exam ${id}`, () =>
     request('POST', 'exams', '', [{ id, parser_version: PARSER_VERSION, exam }])
@@ -76,4 +86,4 @@ async function putExplanation(examId, questionId, text) {
   );
 }
 
-module.exports = { configured, getExam, putExam, getExplanation, putExplanation };
+module.exports = { configured, listExams, getExam, putExam, getExplanation, putExplanation };

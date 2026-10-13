@@ -44,6 +44,20 @@ test('a stored exam from the current parser is a hit; one from an older parser i
   );
 });
 
+test('listExams asks only for sittings the current parser produced', async () => {
+  let url;
+  await withStubs(
+    { fetch: async (u) => { url = u; return json([{ id: 'winter_2023' }, { id: 'summer_2024' }]); } },
+    async () => {
+      assert.deepStrictEqual(await store.listExams(), ['winter_2023', 'summer_2024']);
+      assert.match(url, new RegExp(`parser_version=eq\.${PARSER_VERSION}`));
+    }
+  );
+  await withStubs({ fetch: async () => { throw new Error('ECONNREFUSED'); } }, async () => {
+    assert.strictEqual(await store.listExams(), null);
+  });
+});
+
 test('putExam upserts the exam stamped with the parser version, using the secret key', async () => {
   let call;
   await withStubs(
