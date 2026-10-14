@@ -41,24 +41,41 @@ function buildPrompt(question) {
   );
 }
 
+// The free tier's larger models spend much of the day returning "high
+// demand" - whichever one is named here is overloaded sooner or later -
+// so a refusal to serve moves on to the next rather than reaching the
+// user. They run best-first, ending with the lite models, which have
+// capacity when the others have none. GEMINI_MODEL pins a single one.
+const MODELS = process.env.GEMINI_MODEL
+  ? [process.env.GEMINI_MODEL]
+  : ['gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-3.5-flash-lite', 'gemini-3.1-flash-lite'];
+
+// 404 belongs with the overload statuses: a model can be retired, or
+// simply never offered to this key, and the next one in the list is the
+// answer either way.
+const TRY_NEXT_MODEL = new Set([404, 429, 503]);
+
 async function askGemini(prompt) {
   const key = process.env.GEMINI_API_KEY;
   if (!key) throw new ExplainerUnavailableError();
-  const model = process.env.GEMINI_MODEL || 'gemini-3.6-flash';
-  const res = await fetch(`${GEMINI_URL}/${model}:generateContent`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: { temperature: 0.3, thinkingConfig: { thinkingLevel: 'minimal' } },
-    }),
-  });
-  if (res.status === 429 || res.status === 503) throw new ExplainerBusyError();
-  if (!res.ok) throw new Error(`Gemini HTTP ${res.status}`);
-  const data = await res.json();
-  const text = data.candidates?.[0]?.content?.parts?.map((p) => p.text).join('').trim();
-  if (!text) throw new Error('Gemini returned no text');
-  return text;
+
+  for (const model of MODELS) {
+    const res = await fetch(`${GEMINI_URL}/${model}:generateContent`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { temperature: 0.3, thinkingConfig: { thinkingLevel: 'low' } },
+      }),
+    });
+    if (TRY_NEXT_MODEL.has(res.status)) continue;
+    if (!res.ok) throw new Error(`Gemini HTTP ${res.status}`);
+    const data = await res.json();
+    const text = data.candidates?.[0]?.content?.parts?.map((p) => p.text).join('').trim();
+    if (!text) throw new Error('Gemini returned no text');
+    return text;
+  }
+  throw new ExplainerBusyError();
 }
 
 function cachePath(season, year) {

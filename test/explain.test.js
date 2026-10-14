@@ -93,7 +93,26 @@ test('simultaneous requests for one uncached question share a single API call', 
   );
 });
 
-test('no API key is the unavailable error, and a quota hit is the busy error - neither is cached', async () => {
+test('an overloaded model is passed over for the next one', async () => {
+  const tried = [];
+  await withStubs(
+    {
+      fetch: async (url) => {
+        tried.push(url.match(/models\/([^:]+):/)[1]);
+        return tried.length < 3
+          ? { ok: false, status: tried.length === 1 ? 503 : 429, json: async () => ({}) }
+          : geminiReply('הסבר מדגם זמין');
+      },
+    },
+    async () => {
+      assert.strictEqual(await explainQuestion(question, SITTING), 'הסבר מדגם זמין');
+      assert.strictEqual(tried.length, 3);
+      assert.strictEqual(new Set(tried).size, 3);
+    }
+  );
+});
+
+test('no API key is the unavailable error, and every model busy is the busy error - neither is cached', async () => {
   await withStubs({ key: null, fetch: () => assert.fail('must not call the API without a key') }, async () => {
     await assert.rejects(explainQuestion(question, SITTING), ExplainerUnavailableError);
   });
