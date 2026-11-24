@@ -410,8 +410,24 @@ const CHEERS = [
   'נחישות מינימום כמו של ברק בדואלינגו',
 ];
 
+// The place in the list is kept on the device, not in a variable:
+// finishing a simulation and starting another reloads the page, which
+// would otherwise send every run back to the first message.
+const CHEER_INDEX_KEY = 'cheerIndex';
+
+function nextCheer() {
+  let index = 0;
+  try {
+    index = Number(localStorage.getItem(CHEER_INDEX_KEY)) || 0;
+    localStorage.setItem(CHEER_INDEX_KEY, (index + 1) % CHEERS.length);
+  } catch {
+    // storage unavailable - everyone gets the first message
+  }
+  return CHEERS[index % CHEERS.length];
+}
+
 function showCheer() {
-  el['cheer-text'].textContent = CHEERS[Math.floor(Math.random() * CHEERS.length)];
+  el['cheer-text'].textContent = nextCheer();
   el.cheer.hidden = false;
   el['cheer-btn'].focus();
 }
