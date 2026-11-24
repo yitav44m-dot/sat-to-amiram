@@ -68,6 +68,7 @@ const el = {};
   'prev-btn', 'next-btn', 'finish-part-btn',
   'question-card', 'q-instruction', 'passage-box', 'passage-text', 'passage-speak',
   'q-stem-text', 'stem-speak', 'q-options',
+  'cheer', 'cheer-text', 'cheer-btn',
   'results', 'score-value', 'score-detail', 'stat-minutes', 'stat-questions', 'stat-correct',
   'review', 'restart-btn',
 ].forEach((id) => {
@@ -142,6 +143,7 @@ el['prev-btn'].addEventListener('click', () => goToQuestion(state.questionIndex 
 el['next-btn'].addEventListener('click', () => goToQuestion(state.questionIndex + 1));
 el['finish-part-btn'].addEventListener('click', finishPart);
 el['restart-btn'].addEventListener('click', () => location.reload());
+el['cheer-btn'].addEventListener('click', () => { el.cheer.hidden = true; });
 el['stem-speak'].addEventListener('click', () => speak(el['q-stem-text'].textContent));
 el['passage-speak'].addEventListener('click', () => {
   const part = state.parts[state.partIndex];
@@ -398,10 +400,26 @@ function goToQuestion(index) {
   renderQuestion();
 }
 
+const CHEERS = [
+  'יש לך את זה נסיך!',
+  'בחור על Hakef Kefaak',
+  'עוד שתי מילים לאוצר מילים ואתה מזרים לטינות בטיול',
+  'מסע של אלף צעדים מתחיל בצעד אחד - ברנשטיין ערן',
+  'פשוש מה זהו? זאת הסימולציה האחרונה להיום?',
+  'רואה את הציון שלך? יופי. אם אתה מרוצה אז גם אני מרוצה :)',
+];
+
+function showCheer() {
+  el['cheer-text'].textContent = CHEERS[Math.floor(Math.random() * CHEERS.length)];
+  el.cheer.hidden = false;
+  el['cheer-btn'].focus();
+}
+
 function finishPart() {
   state.lockedParts[state.partIndex] = true;
   if (state.partIndex === state.parts.length - 1) {
     showResults();
+    showCheer();
     return;
   }
   openPart(state.partIndex + 1);
